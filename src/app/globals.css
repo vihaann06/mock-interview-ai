@@ -30,6 +30,7 @@
 html,
 body {
   min-height: 100%;
+  height: 100%;
 }
 
 body {
@@ -65,7 +66,8 @@ a {
 .app-shell {
   position: relative;
   z-index: 1;
-  min-height: 100vh;
+  min-height: 100%;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
 }
@@ -78,6 +80,7 @@ a {
   max-width: 1200px;
   width: 100%;
   margin: 0 auto;
+  flex-shrink: 0;
 }
 
 .brand-mark {
@@ -417,230 +420,10 @@ button:disabled {
   font-size: 0.9rem;
 }
 
-/* —— Interview room —— */
-.interview-room {
-  display: grid;
-  grid-template-columns: minmax(220px, 280px) 1fr minmax(240px, 320px);
-  grid-template-rows: auto 1fr;
-  gap: 0.75rem;
-  max-width: 1400px;
-  width: 100%;
-  margin: 0 auto;
-  padding: 0.75rem 1rem 1.25rem;
-  flex: 1;
-  min-height: calc(100vh - 4.5rem);
-}
-
-.interview-topbar {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.35rem 0.25rem;
-}
-
-.interview-topbar h1 {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--ink-muted);
-}
-
-.problem-panel,
-.code-editor,
-.conversation-panel {
-  background: var(--surface-solid);
-  border: 1px solid var(--line);
-  border-radius: 0.45rem;
-  overflow: hidden;
-}
-
-.problem-panel {
-  padding: 1rem 1.1rem;
-  overflow: auto;
-}
-
-.problem-meta {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
-}
-
-.problem-meta h2 {
-  margin: 0;
-  font-size: 1.05rem;
-  font-family: var(--font-display), sans-serif;
-}
-
-.difficulty {
-  font-size: 0.75rem;
-  color: var(--accent-deep);
-}
-
-.problem-statement {
-  font-size: 0.9rem;
-  line-height: 1.5;
-  color: var(--ink);
-}
-
-.problem-panel h3 {
-  margin: 1rem 0 0.4rem;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--ink-muted);
-}
-
-.problem-panel ul {
-  margin: 0;
-  padding-left: 1.1rem;
-  font-size: 0.85rem;
-  color: var(--ink-muted);
-  line-height: 1.45;
-}
-
-.editor-stack {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  gap: 0.75rem;
-}
-
-.code-editor {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 280px;
-}
-
-.editor-toolbar {
-  display: flex;
-  justify-content: space-between;
-  padding: 0.55rem 0.85rem;
-  border-bottom: 1px solid var(--line);
-  font-size: 0.8rem;
-  color: var(--ink-muted);
-}
-
-.code-textarea {
-  flex: 1;
-  width: 100%;
-  border: none;
-  resize: none;
-  padding: 1rem;
-  font-family: var(--font-mono), monospace;
-  font-size: 0.85rem;
-  line-height: 1.5;
-  background: transparent;
-  color: var(--ink);
-  outline: none;
-}
+/* Interview room styles live in src/app/interview/interview-room.css */
 
 .muted {
   color: var(--ink-muted);
-}
-
-.interview-controls {
-  display: flex;
-  gap: 0.6rem;
-  justify-content: flex-end;
-}
-
-.conversation-panel {
-  display: flex;
-  flex-direction: column;
-  min-height: 320px;
-}
-
-.conversation-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.7rem 0.9rem;
-  border-bottom: 1px solid var(--line);
-}
-
-.conversation-header h2 {
-  margin: 0;
-  font-size: 0.95rem;
-}
-
-.stage-badge {
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--accent-deep);
-  background: rgba(14, 124, 134, 0.12);
-  padding: 0.25rem 0.5rem;
-  border-radius: 0.25rem;
-}
-
-.conversation-thread {
-  flex: 1;
-  overflow: auto;
-  padding: 0.9rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.85rem;
-}
-
-.msg-role {
-  display: block;
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--ink-muted);
-  margin-bottom: 0.25rem;
-}
-
-.msg p {
-  margin: 0;
-  font-size: 0.9rem;
-  line-height: 1.45;
-}
-
-.conversation-compose {
-  display: flex;
-  gap: 0.4rem;
-  padding: 0.65rem;
-  border-top: 1px solid var(--line);
-}
-
-.conversation-compose input {
-  flex: 1;
-  border: 1px solid var(--line);
-  border-radius: 0.35rem;
-  padding: 0.55rem 0.7rem;
-  background: #fff;
-  font: inherit;
-}
-
-.conversation-compose button {
-  border: none;
-  border-radius: 0.35rem;
-  padding: 0.55rem 0.85rem;
-  background: var(--accent);
-  color: #fff;
-  font-weight: 600;
-}
-
-.interview-timer {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  font-family: var(--font-mono), monospace;
-  font-size: 0.95rem;
-}
-
-.timer-dot {
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 50%;
-  background: var(--accent);
-  animation: pulse 1.8s ease-in-out infinite;
 }
 
 /* —— Results —— */
@@ -732,10 +515,6 @@ button:disabled {
 }
 
 @media (max-width: 960px) {
-  .interview-room {
-    grid-template-columns: 1fr;
-  }
-
   .workspace {
     grid-template-columns: 1fr;
   }

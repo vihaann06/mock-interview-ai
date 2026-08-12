@@ -75,24 +75,7 @@ export function InterviewControls({
         </Link>
       </div>
       {output != null && (
-        <pre
-          className="run-output"
-          role="status"
-          aria-live="polite"
-          style={{
-            margin: "0.5rem 0 0",
-            padding: "0.65rem 0.75rem",
-            fontFamily: "var(--font-mono), ui-monospace, monospace",
-            fontSize: "0.75rem",
-            lineHeight: 1.45,
-            whiteSpace: "pre-wrap",
-            color: "var(--ink-muted)",
-            background: "transparent",
-            borderTop: "1px solid var(--line)",
-            maxHeight: "6rem",
-            overflow: "auto",
-          }}
-        >
+        <pre className="run-output" role="status" aria-live="polite">
           {output}
         </pre>
       )}
