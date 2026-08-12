@@ -26,6 +26,7 @@ import type {
   InterviewerResponse,
   InterviewSession,
 } from "@/lib/types/interview";
+import "../interview-room.css";
 
 function isHintAction(
   action: InterviewerAction,

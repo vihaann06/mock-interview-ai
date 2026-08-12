@@ -75,18 +75,11 @@ export function CodeEditor({
 
   return (
     <div className="code-editor" role="region" aria-label="Code editor">
-      <div className="editor-toolbar">
-        <span>Python</span>
-        <span className="muted">{readOnly ? "Read-only" : "Monaco"}</span>
+      <div className="editor-toolbar pane-header">
+        <span>Code</span>
+        <span className="muted">{readOnly ? "Read-only · Python" : "Python · Monaco"}</span>
       </div>
-      <div
-        className="monaco-editor-host"
-        style={{
-          flex: 1,
-          minHeight: 240,
-          position: "relative",
-        }}
-      >
+      <div className="monaco-editor-host">
         <Editor
           height="100%"
           defaultLanguage="python"
@@ -95,7 +88,11 @@ export function CodeEditor({
           onChange={handleChange}
           onMount={handleMount}
           theme="vs"
-          loading={<p className="muted" style={{ padding: "1rem" }}>Loading editor…</p>}
+          loading={
+            <p className="muted" style={{ padding: "1rem" }}>
+              Loading editor…
+            </p>
+          }
           options={{
             readOnly,
             minimap: { enabled: false },

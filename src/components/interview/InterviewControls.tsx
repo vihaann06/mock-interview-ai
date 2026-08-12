@@ -104,47 +104,15 @@ export function InterviewControls({
           }
           role="status"
           aria-live="polite"
-          style={{
-            margin: "0.5rem 0 0",
-            padding: "0.65rem 0.75rem",
-            borderTop: "1px solid var(--line)",
-            maxHeight: "8rem",
-            overflow: "auto",
-          }}
         >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              gap: "0.75rem",
-              marginBottom: "0.35rem",
-              fontSize: "0.7rem",
-              letterSpacing: "0.02em",
-              textTransform: "uppercase",
-              color: lastResult.ok && !lastResult.timedOut
-                ? "var(--ink)"
-                : "var(--danger, #b42318)",
-            }}
-          >
+          <div className="run-output-meta">
             <span>{statusLabel}</span>
-            <span style={{ color: "var(--ink-muted)", textTransform: "none" }}>
+            <span>
               {lastResult.provider}
               {lastResult.exitCode != null ? ` · exit ${lastResult.exitCode}` : ""}
             </span>
           </div>
-          <pre
-            style={{
-              margin: 0,
-              fontFamily: "var(--font-mono), ui-monospace, monospace",
-              fontSize: "0.75rem",
-              lineHeight: 1.45,
-              whiteSpace: "pre-wrap",
-              color: "var(--ink-muted)",
-              background: "transparent",
-            }}
-          >
-            {output}
-          </pre>
+          <pre>{output}</pre>
         </div>
       )}
     </div>

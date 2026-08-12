@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
 interface Message {
   role: "interviewer" | "candidate";
@@ -26,7 +26,14 @@ export function ConversationPanel({
   disabled = false,
 }: ConversationPanelProps) {
   const [draft, setDraft] = useState("");
+  const threadRef = useRef<HTMLDivElement>(null);
   const inputDisabled = disabled || pending || !onSend;
+
+  useEffect(() => {
+    const el = threadRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [messages, pending, error]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -38,11 +45,11 @@ export function ConversationPanel({
 
   return (
     <section className="conversation-panel" aria-label="Interviewer conversation">
-      <header className="conversation-header">
+      <header className="conversation-header pane-header">
         <h2>Interviewer</h2>
         <span className="stage-badge">{stageLabel}</span>
       </header>
-      <div className="conversation-thread">
+      <div className="conversation-thread" ref={threadRef}>
         {messages.map((m, i) => (
           <div key={`${m.role}-${i}`} className={`msg msg-${m.role}`}>
             <span className="msg-role">
@@ -52,16 +59,12 @@ export function ConversationPanel({
           </div>
         ))}
         {pending ? (
-          <p className="muted" aria-live="polite">
+          <p className="conversation-status muted" aria-live="polite">
             Interviewer is thinking…
           </p>
         ) : null}
         {error ? (
-          <p
-            className="conversation-error"
-            role="alert"
-            style={{ margin: 0, color: "var(--danger)", fontSize: "0.85rem" }}
-          >
+          <p className="conversation-error" role="alert">
             {error}
           </p>
         ) : null}
