@@ -14,10 +14,22 @@ AI interviewer, code sandbox, voice, and evaluation are stubbed for later days.
 
 ```bash
 npm install
+cp .env.example .env.local
+# set OPENAI_API_KEY in .env.local
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
+
+### Environment variables
+
+| Variable | Required | Description |
+| --- | --- | --- |
+| `OPENAI_API_KEY` | Yes (for live interviewer) | API key for OpenAI-compatible Chat Completions |
+| `OPENAI_MODEL` | No | Defaults to `gpt-4o-mini` |
+| `OPENAI_BASE_URL` | No | Optional base URL for compatible providers |
+
+Without `OPENAI_API_KEY`, the interview room UI loads but `/api/interview/turn` returns an error.
 
 ## App routes
 

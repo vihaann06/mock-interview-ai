@@ -1,5 +1,7 @@
 "use client";
 
+import { useState, type FormEvent } from "react";
+
 interface Message {
   role: "interviewer" | "candidate";
   content: string;
@@ -8,10 +10,32 @@ interface Message {
 interface ConversationPanelProps {
   messages: Message[];
   stageLabel: string;
+  onSend?: (message: string) => void | Promise<void>;
+  pending?: boolean;
+  error?: string | null;
+  disabled?: boolean;
 }
 
-/** Placeholder conversation panel — AI interviewer on Day 2, voice on Day 4. */
-export function ConversationPanel({ messages, stageLabel }: ConversationPanelProps) {
+/** Live conversation panel — candidate input wired to /api/interview/turn. */
+export function ConversationPanel({
+  messages,
+  stageLabel,
+  onSend,
+  pending = false,
+  error = null,
+  disabled = false,
+}: ConversationPanelProps) {
+  const [draft, setDraft] = useState("");
+  const inputDisabled = disabled || pending || !onSend;
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    const text = draft.trim();
+    if (!text || inputDisabled) return;
+    setDraft("");
+    await onSend?.(text);
+  }
+
   return (
     <section className="conversation-panel" aria-label="Interviewer conversation">
       <header className="conversation-header">
@@ -27,20 +51,33 @@ export function ConversationPanel({ messages, stageLabel }: ConversationPanelPro
             <p>{m.content}</p>
           </div>
         ))}
+        {pending ? (
+          <p className="muted" aria-live="polite">
+            Interviewer is thinking…
+          </p>
+        ) : null}
+        {error ? (
+          <p
+            className="conversation-error"
+            role="alert"
+            style={{ margin: 0, color: "var(--danger)", fontSize: "0.85rem" }}
+          >
+            {error}
+          </p>
+        ) : null}
       </div>
-      <form
-        className="conversation-compose"
-        onSubmit={(e) => {
-          e.preventDefault();
-        }}
-      >
+      <form className="conversation-compose" onSubmit={handleSubmit}>
         <input
           type="text"
-          placeholder="Type a reply (AI mocked for now)…"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder={
+            pending ? "Waiting for interviewer…" : "Type a reply…"
+          }
           aria-label="Message the interviewer"
-          disabled
+          disabled={inputDisabled}
         />
-        <button type="submit" disabled>
+        <button type="submit" disabled={inputDisabled || !draft.trim()}>
           Send
         </button>
       </form>
