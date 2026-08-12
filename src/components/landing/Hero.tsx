@@ -16,9 +16,6 @@ export function Hero() {
           <Link href="/companies" className="btn-primary">
             Start mock interview
           </Link>
-          <Link href="/setup" className="btn-secondary">
-            View interview setup
-          </Link>
         </div>
       </div>
 

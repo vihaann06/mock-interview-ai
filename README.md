@@ -6,7 +6,7 @@ Realistic technical interview practice: company-style questions, an AI interview
 
 **Text-based AI interview MVP is wired.** You can:
 
-1. Open an interview (prefer enriched questions: `two-sum`, `number-of-islands`, `lru-cache`)
+1. Choose a company on `/companies` — the app picks a **random** question from that company's bank and opens the interview (no manual question picker)
 2. Chat with a structured AI interviewer
 3. Edit Python in Monaco; Run Code uses a mock sandbox adapter (no server-side eval)
 4. Persist session stage / hints / events in client memory for the duration of the interview
@@ -48,8 +48,8 @@ npm test
 | Route | Purpose |
 | --- | --- |
 | `/` | Landing |
-| `/companies` | Company style selection |
-| `/setup` | Question / interview setup |
+| `/companies` | Company style selection (start interview) |
+| `/setup` | Redirects to a random `/interview/[id]?company=` for the chosen company |
 | `/interview/[id]` | Interview room (problem, Monaco, chat, timer) |
 | `/api/interview/turn` | LLM interviewer turn (JSON `InterviewerResponse`) |
 | `/results/[id]` | Hiring-style results (placeholder) |

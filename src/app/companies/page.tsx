@@ -7,8 +7,9 @@ export default function CompaniesPage() {
       <header className="page-header">
         <h1>Choose a company style</h1>
         <p>
-          Interviews are modeled on publicly reported formats — not internal
-          hiring rubrics. MVP starts with Google-style DSA.
+          Pick a company — we assign a random problem from that bank and start
+          the interview. Formats are modeled on publicly reported screens, not
+          internal hiring rubrics.
         </p>
       </header>
 
