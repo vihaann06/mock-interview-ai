@@ -1,10 +1,11 @@
-import type { InterviewStage } from "./interview";
+import type { InterviewStage, InterviewerAction } from "./interview";
 
 /**
  * Event stream is the source of truth for the interview.
- * timestamp is seconds (or ms) from interview start.
+ * `timestamp` is milliseconds since interview start (elapsed).
  */
 export type InterviewEventType =
+  | "interview_started"
   | "candidate_message"
   | "interviewer_message"
   | "candidate_explanation"
@@ -22,9 +23,17 @@ export type InterviewEventType =
   | "candidate_silent";
 
 export interface InterviewEvent {
+  id: string;
   timestamp: number;
   type: InterviewEventType;
   content?: string;
   stage: InterviewStage;
-  metadata?: Record<string, unknown>;
+  metadata?: {
+    action?: InterviewerAction;
+    hintLevel?: 1 | 2 | 3;
+    fromStage?: InterviewStage;
+    toStage?: InterviewStage;
+    language?: string;
+    [key: string]: unknown;
+  };
 }

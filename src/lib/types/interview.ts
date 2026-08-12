@@ -1,7 +1,8 @@
 /**
- * Interview stage machine (Day 1 skeleton).
- * The interviewer should always know which stage is active.
+ * Shared contracts for multi-agent MVP pass.
+ * Interview domain source of truth — keep imports pointing here.
  */
+
 export type InterviewStage =
   | "INTRO"
   | "CLARIFICATION"
@@ -21,6 +22,7 @@ export const INTERVIEW_STAGE_ORDER: InterviewStage[] = [
   "WRAP_UP",
 ];
 
+/** Structured interviewer actions (model must choose one). */
 export type InterviewerAction =
   | "ACKNOWLEDGE"
   | "PROBE"
@@ -41,13 +43,34 @@ export type HiringVerdict =
   | "Lean No Hire"
   | "No Hire";
 
+export type MessageRole = "candidate" | "interviewer" | "system";
+
+export interface InterviewMessage {
+  id: string;
+  role: MessageRole;
+  content: string;
+  timestamp: number; // ms since epoch
+  action?: InterviewerAction;
+}
+
 export interface InterviewSession {
   id: string;
   companyId: string;
   questionId: string;
   stage: InterviewStage;
-  startedAt: number | null;
+  startedAt: number; // ms epoch; 0 if not started
   endedAt: number | null;
-  hintsGiven: number;
   code: string;
+  language: string; // "python" for MVP
+  hintsUsed: number; // 0–3; next hint must be hintsUsed + 1
+  messages: InterviewMessage[];
+  events: import("./events").InterviewEvent[];
+}
+
+/** Strict LLM interviewer output — validate before applying. */
+export interface InterviewerResponse {
+  action: InterviewerAction;
+  message: string;
+  /** Optional requested next stage — server/session must validate; never trust blindly. */
+  suggestedStage?: InterviewStage | null;
 }

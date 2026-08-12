@@ -5,6 +5,10 @@ export interface HintLadder {
   text: string;
 }
 
+/**
+ * Question bank schema. Enrich deeply for a few MVP questions;
+ * other entries may remain lighter stubs.
+ */
 export interface Question {
   id: string;
   title: string;
@@ -13,7 +17,11 @@ export interface Question {
   expectedTimeMinutes: number;
   statement: string;
   constraints: string[];
+  /** Candidate-facing clarifying Q&A the interviewer may use. */
   clarifications: string[];
+  /** High-level expected approaches (not full solution dumps in prompts). */
+  expectedApproaches: string[];
+  /** Kept for backwards compat / evaluator; interviewer must not leak these. */
   solutions: string[];
   commonMistakes: string[];
   edgeCases: string[];

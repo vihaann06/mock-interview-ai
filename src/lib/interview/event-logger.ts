@@ -1,18 +1,22 @@
-import type { InterviewEvent } from "@/lib/types/events";
+import type { InterviewEvent, InterviewEventType } from "@/lib/types/events";
 import type { InterviewStage } from "@/lib/types/interview";
 
+function newId(): string {
+  return `evt_${Math.random().toString(36).slice(2, 10)}_${Date.now().toString(36)}`;
+}
+
 /**
- * Placeholder event logger — Day 1 skeleton.
- * Later this becomes the source of truth for interviewer + evaluation.
+ * Event logger — source of truth append-only stream for a session.
  */
 export function createEvent(
-  type: InterviewEvent["type"],
+  type: InterviewEventType,
   stage: InterviewStage,
   content?: string,
   timestamp = 0,
-  metadata?: Record<string, unknown>,
+  metadata?: InterviewEvent["metadata"],
 ): InterviewEvent {
   return {
+    id: newId(),
     timestamp,
     type,
     content,
