@@ -5,7 +5,7 @@ import {
   assertActionAllowed,
   buildInterviewerContext,
   buildSystemPrompt,
-  parseAndValidateInterviewerResponse,
+  tryParseInterviewerResponse,
 } from "@/lib/interviewer";
 import type {
   InterviewMessage,
@@ -74,15 +74,26 @@ export async function POST(req: Request) {
   const code = session.code ?? question.starterCode ?? "";
   const messages = Array.isArray(session.messages) ? session.messages : [];
 
+  const transcript = messages.map((m) => ({
+    role: m.role,
+    content: m.content,
+  }));
+
+  // Ensure the latest candidate turn is present even if the client omitted it.
+  const last = transcript[transcript.length - 1];
+  if (!last || last.role !== "candidate" || last.content !== candidateMessage) {
+    transcript.push({ role: "candidate", content: candidateMessage });
+  }
+
   const system = buildSystemPrompt(company?.behaviors);
   const user = buildInterviewerContext({
     question,
     stage,
-    messages,
+    transcript,
     hintsUsed,
-    code,
+    currentCode: code,
     companyBehaviors: company?.behaviors,
-    candidateMessage,
+    language: session.language ?? "python",
   });
 
   const client = new OpenAI({
@@ -112,18 +123,18 @@ export async function POST(req: Request) {
     return jsonError("Empty model response", 502);
   }
 
-  const parsed = parseAndValidateInterviewerResponse(content);
+  const parsed = tryParseInterviewerResponse(content);
   if (!parsed.ok) {
     return jsonError(`Invalid interviewer JSON: ${parsed.error}`, 502);
   }
 
   try {
-    assertActionAllowed(parsed.data.action, { hintsUsed, stage });
+    assertActionAllowed(parsed.value.action, { hintsUsed, stage });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Action not allowed";
     return jsonError(message, 422);
   }
 
   // suggestedStage is returned for the client — do not apply server-side.
-  return Response.json({ response: parsed.data });
+  return Response.json({ response: parsed.value });
 }

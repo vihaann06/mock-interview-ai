@@ -8,22 +8,57 @@ import { InterviewControls } from "@/components/interview/InterviewControls";
 import { InterviewTimer } from "@/components/interview/InterviewTimer";
 import { ProblemPanel } from "@/components/interview/ProblemPanel";
 import { getQuestionById } from "@/lib/data/questions";
-import { getStageLabel } from "@/lib/interview/stages";
-import type {
-  InterviewerResponse,
-  InterviewSession,
-} from "@/lib/types/interview";
 import {
   appendCandidateMessage,
   appendInterviewerMessage,
   applyHintFromAction,
-  applySuggestedStageIfSafe,
+  applyStageAction,
   createSession,
   endInterview,
-  moveForwardIfSafe,
+  getStageLabel,
+  moveForward,
+  snapshotCode,
   startInterview,
-  updateSessionCode,
-} from "./session-client";
+  updateCode,
+} from "@/lib/interview";
+import type {
+  InterviewerAction,
+  InterviewerResponse,
+  InterviewSession,
+} from "@/lib/types/interview";
+
+function isHintAction(
+  action: InterviewerAction,
+): action is "GIVE_HINT_1" | "GIVE_HINT_2" | "GIVE_HINT_3" {
+  return (
+    action === "GIVE_HINT_1" ||
+    action === "GIVE_HINT_2" ||
+    action === "GIVE_HINT_3"
+  );
+}
+
+function applyInterviewerTurn(
+  session: InterviewSession,
+  reply: InterviewerResponse,
+): InterviewSession {
+  let next = appendInterviewerMessage(session, reply.message, reply.action);
+
+  if (isHintAction(reply.action)) {
+    try {
+      next = applyHintFromAction(next, reply.action, reply.message);
+    } catch {
+      // Ladder already enforced server-side; ignore client-side races.
+    }
+  }
+
+  try {
+    next = applyStageAction(next, reply.action, reply.suggestedStage);
+  } catch {
+    // Never let a bad stage suggestion wipe the turn.
+  }
+
+  return next;
+}
 
 export function InterviewRoom() {
   const params = useParams<{ id: string }>();
@@ -38,30 +73,71 @@ export function InterviewRoom() {
 
   const [session, setSession] = useState<InterviewSession | null>(() => {
     if (!question) return null;
-    const created = createSession({
+    let s = createSession({
       companyId,
       questionId: question.id,
       starterCode: question.starterCode,
+      language: "python",
     });
-    return startInterview(created, opening);
+    s = startInterview(s);
+    // Move into clarification for the opening prompt.
+    try {
+      s = moveForward(s);
+    } catch {
+      // stay on INTRO if transition fails
+    }
+    s = appendInterviewerMessage(s, opening);
+    return s;
   });
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleCodeChange = useCallback((code: string) => {
-    setSession((prev) => (prev ? updateSessionCode(prev, code) : prev));
+    setSession((prev) => {
+      if (!prev || prev.endedAt) return prev;
+      try {
+        return updateCode(prev, code);
+      } catch {
+        return { ...prev, code };
+      }
+    });
+  }, []);
+
+  const handleStableSnapshot = useCallback((code: string) => {
+    setSession((prev) => {
+      if (!prev || prev.endedAt) return prev;
+      try {
+        const withCode = prev.code === code ? prev : updateCode(prev, code);
+        return snapshotCode(withCode);
+      } catch {
+        return prev;
+      }
+    });
   }, []);
 
   const handleEnd = useCallback(() => {
-    setSession((prev) => (prev ? endInterview(prev) : prev));
+    setSession((prev) => {
+      if (!prev) return prev;
+      try {
+        return endInterview(prev);
+      } catch {
+        return prev;
+      }
+    });
   }, []);
 
   const handleSend = useCallback(
     async (message: string) => {
-      if (!session || !question || pending) return;
+      if (!session || !question || pending || session.endedAt) return;
 
       setError(null);
-      const withCandidate = appendCandidateMessage(session, message);
+      let withCandidate: InterviewSession;
+      try {
+        withCandidate = appendCandidateMessage(session, message);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Could not record message");
+        return;
+      }
       setSession(withCandidate);
       setPending(true);
 
@@ -72,7 +148,7 @@ export function InterviewRoom() {
           body: JSON.stringify({
             candidateMessage: message,
             questionId: question.id,
-            companyId: session.companyId,
+            companyId: withCandidate.companyId,
             session: {
               id: withCandidate.id,
               stage: withCandidate.stage,
@@ -97,15 +173,12 @@ export function InterviewRoom() {
         const reply = data.response;
         setSession((prev) => {
           const base = prev ?? withCandidate;
-          let next = appendInterviewerMessage(base, reply.message, reply.action);
-          next = applyHintFromAction(next, reply.action);
-          if (reply.action === "MOVE_FORWARD") {
-            next = moveForwardIfSafe(next);
-          } else {
-            // Optional: honor suggestedStage only when it is the immediate next stage.
-            next = applySuggestedStageIfSafe(next, reply.suggestedStage);
+          try {
+            return applyInterviewerTurn(base, reply);
+          } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to apply reply");
+            return base;
           }
-          return next;
         });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Network error");
@@ -155,10 +228,17 @@ export function InterviewRoom() {
       />
 
       <div className="editor-stack">
-        <CodeEditor value={session.code} onChange={handleCodeChange} />
+        <CodeEditor
+          value={session.code}
+          onChange={handleCodeChange}
+          language="python"
+          onStableSnapshot={handleStableSnapshot}
+        />
         <InterviewControls
           resultsHref={`/results/${question.id}`}
           onEnd={handleEnd}
+          code={session.code}
+          language="python"
         />
       </div>
 
