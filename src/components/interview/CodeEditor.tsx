@@ -31,7 +31,10 @@ export function CodeEditor({
 }: CodeEditorProps) {
   const snapshotTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestCode = useRef(value);
-  latestCode.current = value;
+
+  useEffect(() => {
+    latestCode.current = value;
+  }, [value]);
 
   useEffect(() => {
     setEditorBuffer(value, language);

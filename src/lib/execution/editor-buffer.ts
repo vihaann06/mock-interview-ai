@@ -4,7 +4,7 @@
  */
 
 let editorBuffer = "";
-let editorLanguage: "python" = "python";
+let editorLanguage = "python" as const;
 
 export function setEditorBuffer(
   code: string,

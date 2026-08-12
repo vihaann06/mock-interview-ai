@@ -31,7 +31,8 @@ export interface CodeExecutionProvider {
 export class MockCodeExecutionProvider implements CodeExecutionProvider {
   readonly id = "mock";
 
-  async run(_request: CodeRunRequest): Promise<CodeRunResult> {
+  async run(request: CodeRunRequest): Promise<CodeRunResult> {
+    void request;
     // Intentionally does not execute candidate code.
     return {
       ok: false,

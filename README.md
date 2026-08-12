@@ -2,13 +2,16 @@
 
 Realistic technical interview practice: company-style questions, an AI interviewer that probes (not tutors), a live IDE, and evidence-based evaluation.
 
-## Week-one status
+## Status
 
-**Day 1 skeleton is in place.** You can click through:
+**Text-based AI interview MVP is wired.** You can:
 
-Landing → Company selection → Setup → Interview room → Results
+1. Open an interview (prefer enriched questions: `two-sum`, `number-of-islands`, `lru-cache`)
+2. Chat with a structured AI interviewer
+3. Edit Python in Monaco; Run Code uses a mock sandbox adapter (no server-side eval)
+4. Persist session stage / hints / events in client memory for the duration of the interview
 
-AI interviewer, code sandbox, voice, and evaluation are stubbed for later days.
+Still stubbed: real code sandbox, voice, evaluator / results scoring.
 
 ## Getting started
 
@@ -31,6 +34,15 @@ Open [http://localhost:3000](http://localhost:3000).
 
 Without `OPENAI_API_KEY`, the interview room UI loads but `/api/interview/turn` returns an error.
 
+## Scripts
+
+```bash
+npm run dev
+npm run build
+npm run lint
+npm test
+```
+
 ## App routes
 
 | Route | Purpose |
@@ -38,30 +50,33 @@ Without `OPENAI_API_KEY`, the interview room UI loads but `/api/interview/turn` 
 | `/` | Landing |
 | `/companies` | Company style selection |
 | `/setup` | Question / interview setup |
-| `/interview/[id]` | Interview room (problem, editor, chat, timer) |
+| `/interview/[id]` | Interview room (problem, Monaco, chat, timer) |
+| `/api/interview/turn` | LLM interviewer turn (JSON `InterviewerResponse`) |
 | `/results/[id]` | Hiring-style results (placeholder) |
 
 ## Project layout
 
 ```
 src/
-  app/                  # Next.js App Router pages
-  components/
-    landing/            # Landing hero
-    interview/          # Interview UI templates
-    layout/             # Shared chrome
+  app/
+    api/interview/turn/   # OpenAI-compatible interviewer route
+    interview/[id]/      # Interview room UI
+  components/interview/   # Monaco editor, chat, controls
   lib/
-    types/              # Interview stages, events, questions, evaluation
-    interview/          # Stage helpers + event logger stub
-    data/               # Company profile + ~10 Google-style DSA questions
+    types/                # Session, events, questions, evaluation
+    interview/            # Session state machine + event logger
+    interviewer/          # Prompts, zod schema, hint policy
+    data/                 # Questions + company profiles
+    execution/            # Provider-agnostic code runner (mock)
 ```
 
-## Core concepts (already typed)
+## Core concepts
 
 - **Stages:** `INTRO` → `CLARIFICATION` → `APPROACH_DISCUSSION` → `CODING` → `TESTING` → `COMPLEXITY_ANALYSIS` → `WRAP_UP`
-- **Events:** candidate/interviewer messages, hints, code snapshots, test runs, stage changes
-- **Interviewer actions:** `PROBE`, `GIVE_HINT_1..3`, `WAIT`, etc. (Day 2)
-- **Evaluation rubric:** 8 categories scored 1–5 with evidence (Day 5)
+- **Events:** candidate/interviewer messages, hints, code snapshots, stage changes
+- **Interviewer actions:** `PROBE`, `GIVE_HINT_1..3`, `WAIT`, `MOVE_FORWARD`, …
+- **Hint ladder:** cannot skip levels; enforced in session + interviewer policy + API
+- **Evaluation rubric:** typed for Day 5 (not wired yet)
 
 ## What not to build in week one
 
