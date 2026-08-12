@@ -17,6 +17,23 @@ interface InterviewControlsProps {
   language?: "python";
 }
 
+function formatOutput(result: CodeRunResult): string {
+  const parts: string[] = [];
+  if (result.timedOut) {
+    parts.push("[timed out]");
+  }
+  if (result.stdout) {
+    parts.push(result.stdout);
+  }
+  if (result.stderr) {
+    parts.push(result.stderr);
+  }
+  if (parts.length === 0) {
+    return result.ok ? "(no output)" : "(failed with no output)";
+  }
+  return parts.join("\n");
+}
+
 export function InterviewControls({
   resultsHref,
   onEnd,
@@ -41,18 +58,22 @@ export function InterviewControls({
         stdout: "",
         stderr: err instanceof Error ? err.message : "Run failed",
         exitCode: null,
-        provider: "mock",
+        provider: "pyodide",
       });
     } finally {
       setRunning(false);
     }
   };
 
-  const output =
+  const output = lastResult == null ? null : formatOutput(lastResult);
+  const statusLabel =
     lastResult == null
       ? null
-      : [lastResult.stdout, lastResult.stderr].filter(Boolean).join("\n") ||
-        "(no output)";
+      : lastResult.timedOut
+        ? "Timed out"
+        : lastResult.ok
+          ? "Success"
+          : "Error";
 
   return (
     <div className="interview-controls-wrap">
@@ -74,27 +95,57 @@ export function InterviewControls({
           End Interview
         </Link>
       </div>
-      {output != null && (
-        <pre
-          className="run-output"
+      {output != null && lastResult != null && (
+        <div
+          className={
+            lastResult.ok && !lastResult.timedOut
+              ? "run-output run-output--ok"
+              : "run-output run-output--error"
+          }
           role="status"
           aria-live="polite"
           style={{
             margin: "0.5rem 0 0",
             padding: "0.65rem 0.75rem",
-            fontFamily: "var(--font-mono), ui-monospace, monospace",
-            fontSize: "0.75rem",
-            lineHeight: 1.45,
-            whiteSpace: "pre-wrap",
-            color: "var(--ink-muted)",
-            background: "transparent",
             borderTop: "1px solid var(--line)",
-            maxHeight: "6rem",
+            maxHeight: "8rem",
             overflow: "auto",
           }}
         >
-          {output}
-        </pre>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              gap: "0.75rem",
+              marginBottom: "0.35rem",
+              fontSize: "0.7rem",
+              letterSpacing: "0.02em",
+              textTransform: "uppercase",
+              color: lastResult.ok && !lastResult.timedOut
+                ? "var(--ink)"
+                : "var(--danger, #b42318)",
+            }}
+          >
+            <span>{statusLabel}</span>
+            <span style={{ color: "var(--ink-muted)", textTransform: "none" }}>
+              {lastResult.provider}
+              {lastResult.exitCode != null ? ` · exit ${lastResult.exitCode}` : ""}
+            </span>
+          </div>
+          <pre
+            style={{
+              margin: 0,
+              fontFamily: "var(--font-mono), ui-monospace, monospace",
+              fontSize: "0.75rem",
+              lineHeight: 1.45,
+              whiteSpace: "pre-wrap",
+              color: "var(--ink-muted)",
+              background: "transparent",
+            }}
+          >
+            {output}
+          </pre>
+        </div>
       )}
     </div>
   );

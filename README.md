@@ -8,10 +8,10 @@ Realistic technical interview practice: company-style questions, an AI interview
 
 1. Open an interview (prefer enriched questions: `two-sum`, `number-of-islands`, `lru-cache`)
 2. Chat with a structured AI interviewer
-3. Edit Python in Monaco; Run Code uses a mock sandbox adapter (no server-side eval)
+3. Edit Python in Monaco; **Run Code** executes in-browser via [Pyodide](https://pyodide.org/) (WASM) — stdout/stderr show under the controls (no server-side eval)
 4. Persist session stage / hints / events in client memory for the duration of the interview
 
-Still stubbed: real code sandbox, voice, evaluator / results scoring.
+Still stubbed: voice, evaluator / results scoring.
 
 ## Getting started
 
@@ -67,7 +67,7 @@ src/
     interview/            # Session state machine + event logger
     interviewer/          # Prompts, zod schema, hint policy
     data/                 # Questions + company profiles
-    execution/            # Provider-agnostic code runner (mock)
+    execution/            # Code runner (Pyodide in browser; mock fallback)
 ```
 
 ## Core concepts
@@ -77,6 +77,15 @@ src/
 - **Interviewer actions:** `PROBE`, `GIVE_HINT_1..3`, `WAIT`, `MOVE_FORWARD`, …
 - **Hint ladder:** cannot skip levels; enforced in session + interviewer policy + API
 - **Evaluation rubric:** typed for Day 5 (not wired yet)
+
+## Run Code (Python)
+
+Interview **Run Code** uses a provider adapter in `src/lib/execution/`:
+
+- **Default (browser):** `PyodideCodeExecutionProvider` — loads Pyodide once from the CDN matching the `pyodide` npm version, runs candidate Python in WASM, captures stdout/stderr, soft-timeout ~5s.
+- **Fallback:** `MockCodeExecutionProvider` remains available (SSR default / tests); call `setCodeExecutionProvider` to swap.
+
+No candidate code is `eval`'d on the Next.js server.
 
 ## What not to build in week one
 

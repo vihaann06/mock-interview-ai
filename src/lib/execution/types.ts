@@ -1,7 +1,7 @@
 /**
  * Code execution adapter (provider-agnostic).
  * Do NOT execute untrusted candidate code on the Next.js server.
- * Wire a real sandbox provider later; keep a mock for local UX.
+ * Browser default: Pyodide (see pyodide-provider.ts). Mock remains for SSR/tests.
  */
 
 export interface CodeRunRequest {
@@ -19,7 +19,7 @@ export interface CodeRunResult {
   stderr: string;
   exitCode: number | null;
   timedOut?: boolean;
-  /** Provider identifier, e.g. "mock" | "piston" | "judge0" */
+  /** Provider identifier, e.g. "mock" | "pyodide" | "piston" | "judge0" */
   provider: string;
 }
 
