@@ -82,7 +82,7 @@ src/
 
 Interview **Run Code** uses a provider adapter in `src/lib/execution/`:
 
-- **Default (browser):** `PyodideCodeExecutionProvider` — loads Pyodide once from the CDN matching the `pyodide` npm version, runs candidate Python in WASM, captures stdout/stderr, soft-timeout ~5s.
+- **Default (browser):** `PyodideCodeExecutionProvider` — loads Pyodide once from the jsDelivr CDN via a `<script>` tag (avoids bundler issues with dynamic imports), runs candidate Python in WASM, captures stdout/stderr, soft-timeout ~5s.
 - **Fallback:** `MockCodeExecutionProvider` remains available (SSR default / tests); call `setCodeExecutionProvider` to swap.
 
 No candidate code is `eval`'d on the Next.js server.

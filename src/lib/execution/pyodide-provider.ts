@@ -1,7 +1,7 @@
 /**
  * Client-side Python execution via Pyodide (WebAssembly).
- * Loads once per page, captures stdout/stderr, and enforces a soft timeout.
- * Does not eval candidate code on the Next.js server.
+ * Loads Pyodide from the CDN via a <script> tag so Next/Turbopack does not
+ * rewrite dynamic imports (which caused "Cannot find module as expression is too dynamic").
  */
 
 import type {
@@ -17,15 +17,77 @@ type PyodideInterface = {
   runPythonAsync: (code: string) => Promise<unknown>;
 };
 
+type LoadPyodideFn = (config?: {
+  indexURL?: string;
+}) => Promise<PyodideInterface>;
+
+declare global {
+  interface Window {
+    loadPyodide?: LoadPyodideFn;
+  }
+}
+
 const DEFAULT_TIMEOUT_MS = 5_000;
 
-/** Keep indexURL aligned with the installed `pyodide` package version. */
-const PYODIDE_INDEX_URL =
-  "https://cdn.jsdelivr.net/pyodide/v0.27.7/full/";
+/** Keep indexURL + script URL on the same Pyodide release. */
+const PYODIDE_VERSION = "0.27.7";
+const PYODIDE_INDEX_URL = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
+const PYODIDE_SCRIPT_URL = `${PYODIDE_INDEX_URL}pyodide.js`;
 
 function joinChunks(chunks: string[]): string {
   if (chunks.length === 0) return "";
   return chunks.join("\n").replace(/\n+$/, "");
+}
+
+function loadPyodideScript(): Promise<LoadPyodideFn> {
+  if (typeof window === "undefined") {
+    return Promise.reject(
+      new Error("Pyodide code execution is only available in the browser."),
+    );
+  }
+
+  if (typeof window.loadPyodide === "function") {
+    return Promise.resolve(window.loadPyodide);
+  }
+
+  const existing = document.querySelector<HTMLScriptElement>(
+    `script[data-pyodide="${PYODIDE_VERSION}"]`,
+  );
+  if (existing) {
+    return new Promise((resolve, reject) => {
+      existing.addEventListener("load", () => {
+        if (typeof window.loadPyodide === "function") {
+          resolve(window.loadPyodide);
+        } else {
+          reject(new Error("Pyodide script loaded but loadPyodide is missing."));
+        }
+      });
+      existing.addEventListener("error", () =>
+        reject(new Error("Failed to load Pyodide script.")),
+      );
+    });
+  }
+
+  return new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = PYODIDE_SCRIPT_URL;
+    script.async = true;
+    script.dataset.pyodide = PYODIDE_VERSION;
+    script.onload = () => {
+      if (typeof window.loadPyodide === "function") {
+        resolve(window.loadPyodide);
+      } else {
+        reject(new Error("Pyodide script loaded but loadPyodide is missing."));
+      }
+    };
+    script.onerror = () =>
+      reject(
+        new Error(
+          `Failed to load Pyodide from CDN (${PYODIDE_SCRIPT_URL}). Check your network.`,
+        ),
+      );
+    document.head.appendChild(script);
+  });
 }
 
 export class PyodideCodeExecutionProvider implements CodeExecutionProvider {
@@ -41,10 +103,8 @@ export class PyodideCodeExecutionProvider implements CodeExecutionProvider {
     }
     if (!this.loadPromise) {
       this.loadPromise = (async () => {
-        const { loadPyodide } = await import("pyodide");
-        return (await loadPyodide({
-          indexURL: PYODIDE_INDEX_URL,
-        })) as PyodideInterface;
+        const loadPyodide = await loadPyodideScript();
+        return loadPyodide({ indexURL: PYODIDE_INDEX_URL });
       })().catch((err) => {
         this.loadPromise = null;
         throw err;
