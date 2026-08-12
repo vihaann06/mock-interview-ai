@@ -8,7 +8,6 @@ export function SiteHeader() {
       </Link>
       <nav className="site-nav" aria-label="Primary">
         <Link href="/companies">Companies</Link>
-        <Link href="/setup">Setup</Link>
       </nav>
     </header>
   );

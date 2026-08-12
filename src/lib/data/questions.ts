@@ -465,3 +465,22 @@ export function getQuestionsByCompany(company: string): Question[] {
     (q) => q.company.toLowerCase() === company.toLowerCase(),
   );
 }
+
+/**
+ * Pick any question from the company's bank (uniform random).
+ * Accepts company display name or id (case-insensitive match on `Question.company`).
+ */
+export function pickRandomQuestionForCompany(
+  companyIdOrName: string,
+): Question | undefined {
+  const pool = getQuestionsByCompany(companyIdOrName);
+  if (pool.length === 0) return undefined;
+  const index = Math.floor(Math.random() * pool.length);
+  return pool[index];
+}
+
+export function pickRandomQuestionId(
+  companyIdOrName: string,
+): string | undefined {
+  return pickRandomQuestionForCompany(companyIdOrName)?.id;
+}
