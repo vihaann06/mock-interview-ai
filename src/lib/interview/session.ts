@@ -90,6 +90,10 @@ export function createSession(input: CreateSessionInput): InterviewSession {
     hintsUsed: 0,
     messages: [],
     events: [],
+    latestExecution: null,
+    lastCandidateTurnAt: null,
+    lastCodeActivityAt: null,
+    lastExecutionAt: null,
   };
 }
 

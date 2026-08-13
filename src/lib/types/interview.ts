@@ -53,6 +53,36 @@ export interface InterviewMessage {
   action?: InterviewerAction;
 }
 
+/** Free-form run result (candidate-written tests only — no harness). */
+export type ExecutionStatus =
+  | "success"
+  | "error"
+  | "timeout"
+  | "not_run";
+
+export interface LatestExecution {
+  status: ExecutionStatus;
+  stdout?: string;
+  stderr?: string;
+  timedOut?: boolean;
+  exitCode?: number | null;
+  provider?: string;
+  ranAt: number; // ms epoch
+}
+
+/**
+ * Semantic candidate turn — primary interaction event for text or future STT.
+ * One turn per send / end-of-speech; not per keystroke.
+ */
+export interface CandidateTurnPayload {
+  transcript: string;
+  codeSnapshot: string;
+  stage: InterviewStage;
+  /** Seconds since interview start. */
+  elapsedSeconds: number;
+  latestExecution?: LatestExecution | null;
+}
+
 export interface InterviewSession {
   id: string;
   companyId: string;
@@ -65,11 +95,24 @@ export interface InterviewSession {
   hintsUsed: number; // 0–3; next hint must be hintsUsed + 1
   messages: InterviewMessage[];
   events: import("./events").InterviewEvent[];
+  /** Latest free-form execution result (not question harness). */
+  latestExecution: LatestExecution | null;
+  /**
+   * Transient activity clocks (ms epoch). Not semantic events.
+   * Used for inactivity / voice readiness — update without flooding `events`.
+   */
+  lastCandidateTurnAt: number | null;
+  lastCodeActivityAt: number | null;
+  lastExecutionAt: number | null;
 }
 
 /** Strict LLM interviewer output — validate before applying. */
 export interface InterviewerResponse {
   action: InterviewerAction;
+  /**
+   * Spoken/text reply. Empty/whitespace allowed for WAIT
+   * (UI must not render a bubble for WAIT).
+   */
   message: string;
   /** Optional requested next stage — server/session must validate; never trust blindly. */
   suggestedStage?: InterviewStage | null;
