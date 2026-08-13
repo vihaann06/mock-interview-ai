@@ -9,15 +9,18 @@ import { InterviewTimer } from "@/components/interview/InterviewTimer";
 import { ProblemPanel } from "@/components/interview/ProblemPanel";
 import { getQuestionById } from "@/lib/data/questions";
 import {
-  appendInterviewerMessage,
   applyHintFromAction,
   applyStageAction,
   createSession,
   endInterview,
   getStageLabel,
   moveForward,
+  recordCandidateTurn,
+  recordExecutionRun,
+  recordInterviewerTurn,
   snapshotCode,
   startInterview,
+  touchCodeActivity,
 } from "@/lib/interview";
 import {
   toLatestExecution,
@@ -28,12 +31,6 @@ import type {
   InterviewerResponse,
   InterviewSession,
 } from "@/lib/types/interview";
-import {
-  recordCandidateTurn,
-  recordExecutionRun,
-  recordInterviewerTurn,
-  touchCodeActivity,
-} from "./session-bridge";
 import "../interview-room.css";
 
 function isHintAction(
@@ -50,7 +47,7 @@ function applyInterviewerTurn(
   session: InterviewSession,
   reply: InterviewerResponse,
 ): InterviewSession {
-  // WAIT: records interviewer_turn with no chat bubble (session-bridge).
+  // WAIT: records interviewer_turn with no chat bubble.
   let next = recordInterviewerTurn(session, reply.message, reply.action);
 
   if (isHintAction(reply.action)) {
@@ -96,7 +93,7 @@ export function InterviewRoom() {
     } catch {
       // stay on INTRO if transition fails
     }
-    s = appendInterviewerMessage(s, opening);
+    s = recordInterviewerTurn(s, opening, "ASK_CLARIFICATION");
     return s;
   });
   const [pending, setPending] = useState(false);
