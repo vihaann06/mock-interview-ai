@@ -21,6 +21,8 @@ export { PyodideCodeExecutionProvider } from "./pyodide-provider";
 
 export { setEditorBuffer, getEditorBuffer } from "./editor-buffer";
 
+export { toLatestExecution } from "./to-latest-execution";
+
 import type { CodeRunRequest, CodeRunResult } from "./types";
 import {
   executeCode as execute,

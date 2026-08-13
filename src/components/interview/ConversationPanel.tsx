@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import type { InterviewerAction } from "@/lib/types/interview";
 
 interface Message {
   role: "interviewer" | "candidate";
   content: string;
+  action?: InterviewerAction;
 }
 
 interface ConversationPanelProps {
@@ -14,6 +16,16 @@ interface ConversationPanelProps {
   pending?: boolean;
   error?: string | null;
   disabled?: boolean;
+}
+
+/** Hide empty interviewer bubbles and WAIT with no visible content. */
+function isVisibleMessage(m: Message): boolean {
+  const content = m.content?.trim() ?? "";
+  if (m.role === "interviewer") {
+    if (m.action === "WAIT" && content.length === 0) return false;
+    if (content.length === 0) return false;
+  }
+  return true;
 }
 
 /** Live conversation panel — candidate input wired to /api/interview/turn. */
@@ -28,12 +40,13 @@ export function ConversationPanel({
   const [draft, setDraft] = useState("");
   const threadRef = useRef<HTMLDivElement>(null);
   const inputDisabled = disabled || pending || !onSend;
+  const visibleMessages = messages.filter(isVisibleMessage);
 
   useEffect(() => {
     const el = threadRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
-  }, [messages, pending, error]);
+  }, [visibleMessages, pending, error]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -50,7 +63,7 @@ export function ConversationPanel({
         <span className="stage-badge">{stageLabel}</span>
       </header>
       <div className="conversation-thread" ref={threadRef}>
-        {messages.map((m, i) => (
+        {visibleMessages.map((m, i) => (
           <div key={`${m.role}-${i}`} className={`msg msg-${m.role}`}>
             <span className="msg-role">
               {m.role === "interviewer" ? "Interviewer" : "You"}

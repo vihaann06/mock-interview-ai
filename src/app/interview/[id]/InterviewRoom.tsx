@@ -9,7 +9,6 @@ import { InterviewTimer } from "@/components/interview/InterviewTimer";
 import { ProblemPanel } from "@/components/interview/ProblemPanel";
 import { getQuestionById } from "@/lib/data/questions";
 import {
-  appendCandidateMessage,
   appendInterviewerMessage,
   applyHintFromAction,
   applyStageAction,
@@ -19,13 +18,22 @@ import {
   moveForward,
   snapshotCode,
   startInterview,
-  updateCode,
 } from "@/lib/interview";
+import {
+  toLatestExecution,
+  type CodeRunResult,
+} from "@/lib/execution";
 import type {
   InterviewerAction,
   InterviewerResponse,
   InterviewSession,
 } from "@/lib/types/interview";
+import {
+  recordCandidateTurn,
+  recordExecutionRun,
+  recordInterviewerTurn,
+  touchCodeActivity,
+} from "./session-bridge";
 import "../interview-room.css";
 
 function isHintAction(
@@ -42,7 +50,8 @@ function applyInterviewerTurn(
   session: InterviewSession,
   reply: InterviewerResponse,
 ): InterviewSession {
-  let next = appendInterviewerMessage(session, reply.message, reply.action);
+  // WAIT: records interviewer_turn with no chat bubble (session-bridge).
+  let next = recordInterviewerTurn(session, reply.message, reply.action);
 
   if (isHintAction(reply.action)) {
     try {
@@ -97,9 +106,9 @@ export function InterviewRoom() {
     setSession((prev) => {
       if (!prev || prev.endedAt) return prev;
       try {
-        return updateCode(prev, code);
+        return touchCodeActivity(prev, code);
       } catch {
-        return { ...prev, code };
+        return { ...prev, code, lastCodeActivityAt: Date.now() };
       }
     });
   }, []);
@@ -108,10 +117,26 @@ export function InterviewRoom() {
     setSession((prev) => {
       if (!prev || prev.endedAt) return prev;
       try {
-        const withCode = prev.code === code ? prev : updateCode(prev, code);
+        const withCode =
+          prev.code === code ? prev : touchCodeActivity(prev, code);
         return snapshotCode(withCode);
       } catch {
         return prev;
+      }
+    });
+  }, []);
+
+  const handleExecutionResult = useCallback((result: CodeRunResult) => {
+    setSession((prev) => {
+      if (!prev || prev.endedAt) return prev;
+      try {
+        return recordExecutionRun(prev, toLatestExecution(result));
+      } catch {
+        return {
+          ...prev,
+          latestExecution: toLatestExecution(result),
+          lastExecutionAt: Date.now(),
+        };
       }
     });
   }, []);
@@ -134,7 +159,11 @@ export function InterviewRoom() {
       setError(null);
       let withCandidate: InterviewSession;
       try {
-        withCandidate = appendCandidateMessage(session, message);
+        withCandidate = recordCandidateTurn(session, {
+          transcript: message,
+          codeSnapshot: session.code,
+          latestExecution: session.latestExecution,
+        });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Could not record message");
         return;
@@ -157,6 +186,10 @@ export function InterviewRoom() {
               code: withCandidate.code,
               messages: withCandidate.messages,
               language: withCandidate.language,
+              latestExecution: withCandidate.latestExecution,
+              lastCandidateTurnAt: withCandidate.lastCandidateTurnAt,
+              lastCodeActivityAt: withCandidate.lastCodeActivityAt,
+              lastExecutionAt: withCandidate.lastExecutionAt,
             },
           }),
         });
@@ -167,6 +200,7 @@ export function InterviewRoom() {
         };
 
         if (!res.ok || !data.response) {
+          // Keep candidate turn; do not wipe session on API failure.
           setError(data.error || `Turn failed (${res.status})`);
           return;
         }
@@ -206,6 +240,7 @@ export function InterviewRoom() {
     .map((m) => ({
       role: m.role as "interviewer" | "candidate",
       content: m.content,
+      action: m.action,
     }));
 
   return (
@@ -240,6 +275,7 @@ export function InterviewRoom() {
           onEnd={handleEnd}
           code={session.code}
           language="python"
+          onExecutionResult={handleExecutionResult}
         />
       </div>
 
