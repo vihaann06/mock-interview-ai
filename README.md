@@ -42,8 +42,21 @@ Open [http://localhost:3000](http://localhost:3000).
 | `OPENAI_API_KEY` | Yes (for live interviewer) | API key for OpenAI-compatible Chat Completions |
 | `OPENAI_MODEL` | No | Defaults to `gpt-4o-mini` |
 | `OPENAI_BASE_URL` | No | Optional base URL for compatible providers |
+| `DEEPGRAM_API_KEY` | Yes (for voice STT) | Server-only key; minted into short-lived tokens via `/api/deepgram/token` |
 
 Without `OPENAI_API_KEY`, the interview room UI loads but `/api/interview/turn` returns an error.
+
+### Voice STT (Deepgram Flux)
+
+Streaming speech-to-text uses Deepgram Flux (`flux-general-en` on `/v2/listen`).
+
+1. Set `DEEPGRAM_API_KEY` in `.env.local` (never ship this to the browser).
+2. Client calls `POST` or `GET` `/api/deepgram/token` → `{ accessToken, expiresIn }`.
+3. Use `createDeepgramFluxSTT()` from `@/lib/voice` (or `@/lib/voice/stt`):
+   - `connect()` — mint token, open Flux WebSocket (`Bearer` via WS subprotocol), request mic
+   - `start()` / `stop()` — stream / pause PCM16 16 kHz ~80 ms chunks
+   - `disconnect()` — stop tracks and close the socket
+4. Wire callbacks: `onTurnStart`, `onTranscriptUpdate`, optional `onEagerEndOfTurn` / `onTurnResumed`, and `onTurnEnd` (only `EndOfTurn` produces a `FinalSpeechTurn` for a candidate turn).
 
 ## Scripts
 
@@ -63,6 +76,7 @@ npm test
 | `/setup` | Redirects to a random `/interview/[id]?company=` for the chosen company |
 | `/interview/[id]` | Interview room (problem, Monaco, chat, timer) |
 | `/api/interview/turn` | LLM interviewer turn (JSON `InterviewerResponse`) |
+| `/api/deepgram/token` | Short-lived Deepgram JWT for Flux STT |
 | `/results/[id]` | Hiring-style results (placeholder) |
 
 ## Project layout
@@ -71,12 +85,14 @@ npm test
 src/
   app/
     api/interview/turn/   # OpenAI-compatible interviewer route
+    api/deepgram/token/   # Deepgram short-lived JWT for Flux STT
     interview/[id]/      # Interview room UI
   components/interview/   # Monaco editor, chat, controls
   lib/
     types/                # Session, events, questions, evaluation
     interview/            # Session state machine + event logger
     interviewer/          # Prompts, zod schema, hint policy
+    voice/                # STT/TTS contracts + Deepgram Flux STT provider
     data/                 # Questions + company profiles
     execution/            # Code runner (Pyodide in browser; mock fallback)
 ```

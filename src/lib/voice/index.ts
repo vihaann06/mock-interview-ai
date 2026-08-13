@@ -9,3 +9,5 @@ export type {
   TTSProvider,
   DeepgramTokenResponse,
 } from "./types";
+
+export { createDeepgramFluxSTT } from "./stt";
