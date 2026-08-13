@@ -8,6 +8,7 @@ import { InactivityWatcher } from "@/components/interview/InactivityWatcher";
 import { InterviewControls } from "@/components/interview/InterviewControls";
 import { InterviewTimer } from "@/components/interview/InterviewTimer";
 import { ProblemPanel } from "@/components/interview/ProblemPanel";
+import { VoicePanel } from "@/components/interview/VoicePanel";
 import { getQuestionById } from "@/lib/data/questions";
 import {
   applyHintFromAction,
@@ -172,9 +173,14 @@ export function InterviewRoom() {
     });
   }, []);
 
-  const handleSend = useCallback(
-    async (message: string) => {
-      if (!session || !question || pending || session.endedAt) return;
+  /**
+   * Shared candidate turn path for typed chat and voice EndOfTurn.
+   * Exactly one recordCandidateTurn + /api/interview/turn per non-empty transcript.
+   */
+  const submitCandidateTranscript = useCallback(
+    async (text: string) => {
+      const message = text.trim();
+      if (!message || !session || !question || pending || session.endedAt) return;
 
       setError(null);
       let withCandidate: InterviewSession;
@@ -248,6 +254,11 @@ export function InterviewRoom() {
     [session, question, pending],
   );
 
+  const handleSend = useCallback(
+    (message: string) => submitCandidateTranscript(message),
+    [submitCandidateTranscript],
+  );
+
   if (!question || !session) {
     return (
       <main className="page">
@@ -317,14 +328,21 @@ export function InterviewRoom() {
         />
       </div>
 
-      <ConversationPanel
-        messages={panelMessages}
-        stageLabel={getStageLabel(session.stage)}
-        onSend={handleSend}
-        pending={pending}
-        error={error}
-        disabled={Boolean(session.endedAt)}
-      />
+      <div className="conversation-column">
+        <ConversationPanel
+          messages={panelMessages}
+          stageLabel={getStageLabel(session.stage)}
+          onSend={handleSend}
+          pending={pending}
+          error={error}
+          disabled={Boolean(session.endedAt)}
+        />
+        <VoicePanel
+          onSubmitTranscript={submitCandidateTranscript}
+          pending={pending}
+          disabled={Boolean(session.endedAt)}
+        />
+      </div>
     </main>
   );
 }
