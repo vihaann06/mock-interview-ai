@@ -15,6 +15,8 @@ interface InterviewControlsProps {
   /** Optional override; falls back to live editor buffer. */
   code?: string;
   language?: "python";
+  /** Lift free-form run result to InterviewRoom for session.latestExecution. */
+  onExecutionResult?: (result: CodeRunResult) => void;
 }
 
 function formatOutput(result: CodeRunResult): string {
@@ -39,6 +41,7 @@ export function InterviewControls({
   onEnd,
   code,
   language,
+  onExecutionResult,
 }: InterviewControlsProps) {
   const [running, setRunning] = useState(false);
   const [lastResult, setLastResult] = useState<CodeRunResult | null>(null);
@@ -52,14 +55,17 @@ export function InterviewControls({
         code: code ?? buffer.code,
       });
       setLastResult(result);
+      onExecutionResult?.(result);
     } catch (err) {
-      setLastResult({
+      const failed: CodeRunResult = {
         ok: false,
         stdout: "",
         stderr: err instanceof Error ? err.message : "Run failed",
         exitCode: null,
         provider: "pyodide",
-      });
+      };
+      setLastResult(failed);
+      onExecutionResult?.(failed);
     } finally {
       setRunning(false);
     }
