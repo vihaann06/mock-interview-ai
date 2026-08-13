@@ -8,6 +8,8 @@ export type {
   InterviewerResponse,
   InterviewStage,
   InterviewMessage,
+  LatestExecution,
+  ExecutionStatus,
 } from "@/lib/types/interview";
 
 export type { Question, HintLadder, CompanyProfile } from "@/lib/types/question";
@@ -29,6 +31,13 @@ export interface InterviewerQuestionContext {
   expectedComplexity: { time: string; space: string };
   /** Rubric guidance for the interviewer persona — not full solution dumps. */
   rubricNotes: string[];
+}
+
+/** Latest candidate turn snapshot for claim-vs-code comparison. */
+export interface InterviewerCandidateTurn {
+  transcript: string;
+  codeSnapshot: string;
+  elapsedSeconds: number;
 }
 
 export interface InterviewerContextInput {
@@ -59,6 +68,10 @@ export interface InterviewerContextInput {
   currentCode: string;
   companyBehaviors?: string[];
   language?: string;
+  /** Most recent free-form run result (stdout/stderr/status). */
+  latestExecution?: import("@/lib/types/interview").LatestExecution | null;
+  /** Semantic turn (spoken/text + code at send time). */
+  candidateTurn?: InterviewerCandidateTurn | null;
 }
 
 export interface ActionPolicyContext {

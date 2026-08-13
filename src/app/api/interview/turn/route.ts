@@ -11,6 +11,7 @@ import type {
   InterviewMessage,
   InterviewSession,
   InterviewStage,
+  LatestExecution,
 } from "@/lib/types/interview";
 
 export const runtime = "nodejs";
@@ -25,11 +26,22 @@ interface TurnRequestBody {
     hintsUsed?: number;
     code?: string;
     messages?: InterviewMessage[];
+    latestExecution?: LatestExecution | null;
   };
 }
 
 function jsonError(message: string, status: number) {
   return Response.json({ error: message }, { status });
+}
+
+function isLatestExecution(value: unknown): value is LatestExecution {
+  if (!value || typeof value !== "object") return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.status === "string" &&
+    typeof v.ranAt === "number" &&
+    ["success", "error", "timeout", "not_run"].includes(v.status)
+  );
 }
 
 export async function POST(req: Request) {
@@ -73,6 +85,9 @@ export async function POST(req: Request) {
   const hintsUsed = typeof session.hintsUsed === "number" ? session.hintsUsed : 0;
   const code = session.code ?? question.starterCode ?? "";
   const messages = Array.isArray(session.messages) ? session.messages : [];
+  const latestExecution = isLatestExecution(session.latestExecution)
+    ? session.latestExecution
+    : null;
 
   const transcript = messages.map((m) => ({
     role: m.role,
@@ -85,6 +100,14 @@ export async function POST(req: Request) {
     transcript.push({ role: "candidate", content: candidateMessage });
   }
 
+  const startedAt =
+    typeof session.startedAt === "number" && session.startedAt > 0
+      ? session.startedAt
+      : null;
+  const elapsedSeconds = startedAt
+    ? Math.max(0, Math.floor((Date.now() - startedAt) / 1000))
+    : 0;
+
   const system = buildSystemPrompt(company?.behaviors);
   const user = buildInterviewerContext({
     question,
@@ -94,6 +117,12 @@ export async function POST(req: Request) {
     currentCode: code,
     companyBehaviors: company?.behaviors,
     language: session.language ?? "python",
+    latestExecution,
+    candidateTurn: {
+      transcript: candidateMessage,
+      codeSnapshot: code,
+      elapsedSeconds,
+    },
   });
 
   const client = new OpenAI({
@@ -135,6 +164,6 @@ export async function POST(req: Request) {
     return jsonError(message, 422);
   }
 
-  // suggestedStage is returned for the client — do not apply server-side.
+  // suggestedStage is returned for the client — advisory only; do not apply server-side.
   return Response.json({ response: parsed.value });
 }

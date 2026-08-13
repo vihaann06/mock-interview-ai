@@ -10,6 +10,7 @@ const HINT_ACTIONS: Record<string, number> = {
 /**
  * Hint ladder: next hint level must equal hintsUsed + 1.
  * Cannot GIVE_HINT_2 if hintsUsed < 1, etc.
+ * (Unchanged — stage suggestions remain advisory and do not affect this.)
  */
 export function assertActionAllowed(
   action: InterviewerAction,
@@ -77,15 +78,34 @@ export function stripSolutionLeaks(message: string): string {
   return out;
 }
 
+/**
+ * WAIT may use "" or a single space. Collapse other whitespace-only WAIT
+ * messages to "" so the UI can skip bubbles consistently.
+ */
+export function normalizeWaitMessage(
+  action: InterviewerAction,
+  message: string,
+): string {
+  if (action !== "WAIT") return message;
+  if (message === "" || message === " ") return message;
+  if (message.trim().length === 0) return "";
+  return message;
+}
+
 export function enforceInterviewerPolicy(
   response: InterviewerResponse,
   ctx: ActionPolicyContext,
 ): InterviewerResponse {
   const action = sanitizeAction(response.action, ctx);
-  const message = stripSolutionLeaks(response.message);
+  const message =
+    action === "WAIT"
+      ? normalizeWaitMessage(action, response.message)
+      : stripSolutionLeaks(response.message);
+
   return {
     action,
     message,
+    // suggestedStage is advisory only — pass through; session layer decides.
     suggestedStage: response.suggestedStage ?? null,
   };
 }
