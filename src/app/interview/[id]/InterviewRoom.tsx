@@ -113,7 +113,8 @@ export function InterviewRoom() {
     lastExecutionAt: null,
   });
 
-  const handleLongInactivity = useCallback((_payload: LongInactivityPayload) => {
+  const handleLongInactivity = useCallback((payload: LongInactivityPayload) => {
+    void payload;
     // Later: wire to interviewer PROBE vs WAIT via suggestInactivityFollowUp.
     // Do not speak or call /api/interview/turn automatically from here.
   }, []);
