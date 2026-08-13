@@ -19,7 +19,13 @@ export {
 export {
   createSession,
   startInterview,
+  recordCandidateTurn,
+  recordInterviewerTurn,
+  recordExecutionRun,
+  touchCodeActivity,
+  /** @deprecated Prefer recordCandidateTurn */
   appendCandidateMessage,
+  /** @deprecated Prefer recordInterviewerTurn */
   appendInterviewerMessage,
   updateCode,
   snapshotCode,
@@ -33,4 +39,5 @@ export {
   endInterview,
   getElapsedMs,
   type CreateSessionInput,
+  type RecordCandidateTurnInput,
 } from "./session";

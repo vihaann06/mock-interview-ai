@@ -18,6 +18,10 @@ import {
   appendCandidateMessage,
   appendInterviewerMessage,
   snapshotCode,
+  recordCandidateTurn,
+  recordInterviewerTurn,
+  recordExecutionRun,
+  touchCodeActivity,
 } from "./index";
 
 describe("stages", () => {
@@ -45,6 +49,10 @@ describe("session lifecycle", () => {
     expect(created.startedAt).toBe(0);
     expect(created.stage).toBe("INTRO");
     expect(created.events).toHaveLength(0);
+    expect(created.latestExecution).toBeNull();
+    expect(created.lastCandidateTurnAt).toBeNull();
+    expect(created.lastCodeActivityAt).toBeNull();
+    expect(created.lastExecutionAt).toBeNull();
 
     const started = startInterview(created);
     expect(started.startedAt).toBeGreaterThan(0);
@@ -68,13 +76,82 @@ describe("session lifecycle", () => {
     s = appendCandidateMessage(s, "I'll use a hash map.");
     s = appendInterviewerMessage(s, "What is the time complexity?", "PROBE");
     expect(s.messages).toHaveLength(2);
-    expect(s.events.filter((e) => e.type === "candidate_message")).toHaveLength(1);
+    expect(s.events.filter((e) => e.type === "candidate_turn")).toHaveLength(1);
+    expect(s.events.filter((e) => e.type === "candidate_message")).toHaveLength(0);
+    expect(s.events.filter((e) => e.type === "interviewer_turn")).toHaveLength(1);
 
     s = moveForward(s);
     expect(s.stage).toBe("CLARIFICATION");
     expect(() => transitionStage(s, "CODING")).toThrow();
     s = transitionStage(s, "APPROACH_DISCUSSION");
     expect(s.stage).toBe("APPROACH_DISCUSSION");
+  });
+});
+
+describe("candidate_turn", () => {
+  it("records one candidate_turn with metadata and no candidate_message", () => {
+    let s = startInterview(
+      createSession({
+        companyId: "meta",
+        questionId: "two-sum",
+        starterCode: "def f():\n  pass\n",
+      }),
+    );
+    const snapshot = "def f():\n  return 1\n";
+    s = recordCandidateTurn(s, {
+      transcript: "I'll start with a map.",
+      codeSnapshot: snapshot,
+    });
+
+    expect(s.code).toBe(snapshot);
+    expect(s.lastCandidateTurnAt).toBeGreaterThan(0);
+    expect(s.messages).toHaveLength(1);
+    expect(s.messages[0]?.role).toBe("candidate");
+    expect(s.messages[0]?.content).toBe("I'll start with a map.");
+
+    const turns = s.events.filter((e) => e.type === "candidate_turn");
+    expect(turns).toHaveLength(1);
+    expect(s.events.some((e) => e.type === "candidate_message")).toBe(false);
+    expect(turns[0]?.metadata?.codeSnapshot).toBe(snapshot);
+    expect(turns[0]?.metadata?.stage).toBe("INTRO");
+    expect(typeof turns[0]?.metadata?.elapsedSeconds).toBe("number");
+    expect(turns[0]?.metadata?.latestExecution).toBeNull();
+  });
+});
+
+describe("interviewer_turn WAIT", () => {
+  it("adds no chat bubble for WAIT but may log interviewer_turn", () => {
+    let s = startInterview(
+      createSession({
+        companyId: "meta",
+        questionId: "two-sum",
+        starterCode: "",
+      }),
+    );
+    const beforeMessages = s.messages.length;
+    s = recordInterviewerTurn(s, "", "WAIT");
+    expect(s.messages).toHaveLength(beforeMessages);
+    expect(s.messages.every((m) => m.role !== "interviewer")).toBe(true);
+
+    const waits = s.events.filter(
+      (e) => e.type === "interviewer_turn" && e.metadata?.action === "WAIT",
+    );
+    expect(waits).toHaveLength(1);
+    expect(waits[0]?.content).toBe("");
+  });
+
+  it("appends a bubble for non-WAIT actions", () => {
+    let s = startInterview(
+      createSession({
+        companyId: "meta",
+        questionId: "two-sum",
+        starterCode: "",
+      }),
+    );
+    s = recordInterviewerTurn(s, "Tell me more.", "PROBE");
+    expect(s.messages).toHaveLength(1);
+    expect(s.messages[0]?.role).toBe("interviewer");
+    expect(s.messages[0]?.action).toBe("PROBE");
   });
 });
 
@@ -107,8 +184,8 @@ describe("hints ladder", () => {
   });
 });
 
-describe("code updates", () => {
-  it("emits code_changed and substantial snapshots", () => {
+describe("code activity — no code_changed flood", () => {
+  it("touchCodeActivity / updateCode update clocks without code_changed", () => {
     let s = startInterview(
       createSession({
         companyId: "meta",
@@ -118,15 +195,43 @@ describe("code updates", () => {
     );
     s = updateCode(s, "y");
     expect(s.code).toBe("y");
-    expect(s.events.some((e) => e.type === "code_changed")).toBe(true);
-
-    const big = "a".repeat(40);
-    s = updateCode(s, big);
-    expect(s.events.some((e) => e.type === "code_snapshot")).toBe(true);
+    expect(s.lastCodeActivityAt).toBeGreaterThan(0);
+    expect(s.events.some((e) => e.type === "code_changed")).toBe(false);
+    expect(s.events.some((e) => e.type === "code_snapshot")).toBe(false);
 
     const before = s.events.length;
+    s = touchCodeActivity(s, "a".repeat(40));
+    expect(s.events.length).toBe(before);
+    expect(s.events.some((e) => e.type === "code_changed")).toBe(false);
+
     s = snapshotCode(s);
     expect(s.events.length).toBe(before + 1);
     expect(s.events.at(-1)?.type).toBe("code_snapshot");
+  });
+});
+
+describe("execution_run", () => {
+  it("sets latestExecution and emits execution_run", () => {
+    let s = startInterview(
+      createSession({
+        companyId: "meta",
+        questionId: "two-sum",
+        starterCode: "",
+      }),
+    );
+    const result = {
+      status: "success" as const,
+      stdout: "ok\n",
+      exitCode: 0,
+      ranAt: Date.now(),
+      provider: "piston",
+    };
+    s = recordExecutionRun(s, result);
+    expect(s.latestExecution).toEqual(result);
+    expect(s.lastExecutionAt).toBe(result.ranAt);
+
+    const runs = s.events.filter((e) => e.type === "execution_run");
+    expect(runs).toHaveLength(1);
+    expect(runs[0]?.metadata?.execution).toEqual(result);
   });
 });
