@@ -11,18 +11,19 @@ Realistic technical interview practice: company-style questions, an AI interview
 3. Edit Python in Monaco; **Run Code** executes in-browser via [Pyodide](https://pyodide.org/) (WASM) — stdout/stderr show under the controls (no server-side eval)
 4. Persist session stage / hints / events in client memory for the duration of the interview
 
-Still stubbed: voice, evaluator / results scoring.
+Voice I/O is wired (Deepgram Flux STT + OpenAI TTS + turn-taking / barge-in). Still stubbed: evaluator / results scoring.
 
 
-## Pre-voice interview engine
+## Interview engine
 
-Semantic flow (text today; STT will plug in later):
+Semantic flow (typed chat and spoken EndOfTurn share one path):
 
 1. Candidate message → one `candidate_turn` (transcript + code snapshot + latestExecution + stage)
 2. Monaco edits update `lastCodeActivityAt` only (no keystroke event flood)
 3. Run Code → free-form Pyodide → `execution_run` + `session.latestExecution` (no question harness)
-4. Interviewer receives code + execution + stage + hints; structured actions validated; **WAIT** renders no bubble
-5. Local 5-minute inactivity monitor fires `LONG_INACTIVITY` once per quiet period (no auto interviewer call yet)
+4. Interviewer receives code + execution + stage + hints; structured actions validated; **WAIT** renders no bubble / no TTS
+5. Local 5-minute inactivity monitor can probe once per quiet period (skipped while coding or mid-turn)
+6. Flux **EndOfTurn** only creates a candidate turn; **EagerEndOfTurn** never does. StartOfTurn barges in on TTS.
 
 ## Getting started
 

@@ -1,14 +1,16 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { CodeEditor } from "@/components/interview/CodeEditor";
 import { ConversationPanel } from "@/components/interview/ConversationPanel";
-import { InactivityWatcher } from "@/components/interview/InactivityWatcher";
 import { InterviewControls } from "@/components/interview/InterviewControls";
 import { InterviewTimer } from "@/components/interview/InterviewTimer";
 import { ProblemPanel } from "@/components/interview/ProblemPanel";
+import { VoiceOrchestratorHost } from "@/components/interview/VoiceOrchestratorHost";
 import { VoicePanel } from "@/components/interview/VoicePanel";
+import type { UseVoiceOrchestratorResult } from "@/hooks/useVoiceOrchestrator";
+import { useInterviewerSpeech } from "@/hooks/useInterviewerSpeech";
 import { getQuestionById } from "@/lib/data/questions";
 import {
   applyHintFromAction,
@@ -25,7 +27,6 @@ import {
   snapshotCode,
   startInterview,
   touchCodeActivity,
-  type LongInactivityPayload,
 } from "@/lib/interview";
 import {
   toLatestExecution,
@@ -36,6 +37,7 @@ import type {
   InterviewerResponse,
   InterviewSession,
 } from "@/lib/types/interview";
+import type { FinalSpeechTurn } from "@/lib/voice";
 import "../interview-room.css";
 
 function isHintAction(
@@ -77,6 +79,9 @@ export function InterviewRoom() {
   const searchParams = useSearchParams();
   const companyId = searchParams.get("company") ?? "google";
   const question = getQuestionById(params.id);
+  const { speakInterviewer, stopSpeaking } = useInterviewerSpeech();
+  const orchestratorRef = useRef<UseVoiceOrchestratorResult | null>(null);
+  const [orchestratorReady, setOrchestratorReady] = useState(false);
 
   const opening = useMemo(() => {
     if (!question) return "Problem not found.";
@@ -113,12 +118,6 @@ export function InterviewRoom() {
     lastCodeActivityAt: null,
     lastExecutionAt: null,
   });
-
-  const handleLongInactivity = useCallback((payload: LongInactivityPayload) => {
-    void payload;
-    // Later: wire to interviewer PROBE vs WAIT via suggestInactivityFollowUp.
-    // Do not speak or call /api/interview/turn automatically from here.
-  }, []);
 
   const handleCodeChange = useCallback((code: string) => {
     setLocalActivity((prev) => ({
@@ -163,6 +162,7 @@ export function InterviewRoom() {
   }, []);
 
   const handleEnd = useCallback(() => {
+    stopSpeaking();
     setSession((prev) => {
       if (!prev) return prev;
       try {
@@ -171,28 +171,35 @@ export function InterviewRoom() {
         return prev;
       }
     });
+  }, [stopSpeaking]);
+
+  const onOrchestratorReady = useCallback((api: UseVoiceOrchestratorResult) => {
+    orchestratorRef.current = api;
+    setOrchestratorReady(true);
   }, []);
 
   /**
-   * Shared candidate turn path for typed chat and voice EndOfTurn.
-   * Exactly one recordCandidateTurn + /api/interview/turn per non-empty transcript.
+   * Shared submit for typed chat, voice EndOfTurn, and inactivity probe.
+   * Returns interviewer response for the voice orchestrator (TTS / WAIT).
    */
   const submitCandidateTranscript = useCallback(
-    async (text: string) => {
-      const message = text.trim();
-      if (!message || !session || !question || pending || session.endedAt) return;
+    async (message: string): Promise<InterviewerResponse | null> => {
+      const text = message.trim();
+      if (!text || !session || !question || pending || session.endedAt) {
+        return null;
+      }
 
       setError(null);
       let withCandidate: InterviewSession;
       try {
         withCandidate = recordCandidateTurn(session, {
-          transcript: message,
+          transcript: text,
           codeSnapshot: session.code,
           latestExecution: session.latestExecution,
         });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Could not record message");
-        return;
+        return null;
       }
       setSession(withCandidate);
       setLocalActivity((prev) => ({
@@ -206,7 +213,7 @@ export function InterviewRoom() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            candidateMessage: message,
+            candidateMessage: text,
             questionId: question.id,
             companyId: withCandidate.companyId,
             session: {
@@ -232,7 +239,7 @@ export function InterviewRoom() {
         if (!res.ok || !data.response) {
           // Keep candidate turn; do not wipe session on API failure.
           setError(data.error || `Turn failed (${res.status})`);
-          return;
+          return null;
         }
 
         const reply = data.response;
@@ -245,8 +252,10 @@ export function InterviewRoom() {
             return base;
           }
         });
+        return reply;
       } catch (err) {
         setError(err instanceof Error ? err.message : "Network error");
+        return null;
       } finally {
         setPending(false);
       }
@@ -254,10 +263,32 @@ export function InterviewRoom() {
     [session, question, pending],
   );
 
+  /** Typed chat: submit once, then let orchestrator speak (if any). */
   const handleSend = useCallback(
-    (message: string) => submitCandidateTranscript(message),
+    async (message: string) => {
+      const reply = await submitCandidateTranscript(message);
+      if (reply) {
+        await orchestratorRef.current?.handleInterviewerResponse(reply);
+      }
+    },
     [submitCandidateTranscript],
   );
+
+  /**
+   * Spoken EndOfTurn → orchestrator only (barge-in state + one submit + TTS).
+   * Do not also call submitCandidateTranscript here — handleEndOfTurn owns that.
+   */
+  const handleVoiceSubmit = useCallback(async (text: string) => {
+    const turn: FinalSpeechTurn = {
+      transcript: text,
+      endedAt: Date.now(),
+    };
+    await orchestratorRef.current?.handleEndOfTurn(turn);
+  }, []);
+
+  const handleVoiceTurnStart = useCallback(() => {
+    orchestratorRef.current?.handleStartOfTurn();
+  }, []);
 
   if (!question || !session) {
     return (
@@ -285,14 +316,18 @@ export function InterviewRoom() {
 
   return (
     <main className="interview-room">
-      <InactivityWatcher
+      <VoiceOrchestratorHost
         startedAt={activityClocks.startedAt}
         endedAt={activityClocks.endedAt}
         lastCandidateTurnAt={activityClocks.lastCandidateTurnAt}
         lastCodeActivityAt={activityClocks.lastCodeActivityAt}
         lastExecutionAt={activityClocks.lastExecutionAt}
         enabled={!session.endedAt}
-        onLongInactivity={handleLongInactivity}
+        interviewActive={!session.endedAt}
+        submitCandidateTurn={submitCandidateTranscript}
+        speakInterviewer={speakInterviewer}
+        stopSpeaking={stopSpeaking}
+        onOrchestratorReady={onOrchestratorReady}
       />
       <div className="interview-topbar">
         <h1>
@@ -338,9 +373,10 @@ export function InterviewRoom() {
           disabled={Boolean(session.endedAt)}
         />
         <VoicePanel
-          onSubmitTranscript={submitCandidateTranscript}
+          onSubmitTranscript={handleVoiceSubmit}
+          onVoiceTurnStart={handleVoiceTurnStart}
           pending={pending}
-          disabled={Boolean(session.endedAt)}
+          disabled={!orchestratorReady || Boolean(session.endedAt)}
         />
       </div>
     </main>

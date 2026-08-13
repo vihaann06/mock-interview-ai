@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback } from "react";
 import { useInterviewInactivity } from "@/hooks/useInterviewInactivity";
 import type { LongInactivityPayload } from "@/lib/interview/inactivity";
 
@@ -11,10 +12,17 @@ export interface InactivityWatcherProps {
   lastExecutionAt?: number | null;
   enabled?: boolean;
   /**
-   * Once per quiet period. Wire later to interviewer PROBE vs WAIT
-   * via `suggestInactivityFollowUp` — do not auto-speak here.
+   * Once per quiet period. Prefer `onInactivityProbe` for interviewer
+   * check-ins — this remains available for telemetry / UI.
    */
   onLongInactivity?: (payload: LongInactivityPayload) => void;
+  /**
+   * Once per quiet period when LONG_INACTIVITY fires.
+   * Wire to voice orchestrator probe (synthetic candidate turn).
+   * Do not spam — the inactivity hook latches until activity resumes.
+   * Active coding (fresh lastCodeActivityAt) prevents the fire via isLongInactive.
+   */
+  onInactivityProbe?: (payload: LongInactivityPayload) => void;
 }
 
 /**
@@ -29,7 +37,16 @@ export function InactivityWatcher({
   lastExecutionAt = null,
   enabled = true,
   onLongInactivity,
+  onInactivityProbe,
 }: InactivityWatcherProps) {
+  const handleLongInactivity = useCallback(
+    (payload: LongInactivityPayload) => {
+      onLongInactivity?.(payload);
+      onInactivityProbe?.(payload);
+    },
+    [onLongInactivity, onInactivityProbe],
+  );
+
   useInterviewInactivity({
     clocks: {
       startedAt,
@@ -39,7 +56,7 @@ export function InactivityWatcher({
       lastExecutionAt,
     },
     enabled,
-    onLongInactivity,
+    onLongInactivity: handleLongInactivity,
   });
 
   return null;

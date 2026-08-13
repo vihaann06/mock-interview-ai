@@ -34,7 +34,6 @@ export function useInterviewerSpeech(): UseInterviewerSpeechResult {
   useEffect(() => {
     const provider = createOpenAiTtsProvider();
     providerRef.current = provider;
-    setTtsState(provider.getState());
     const unsub = provider.onStateChange?.((next) => {
       setTtsState(next);
     });
