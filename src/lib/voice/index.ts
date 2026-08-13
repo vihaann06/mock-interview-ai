@@ -9,3 +9,9 @@ export type {
   TTSProvider,
   DeepgramTokenResponse,
 } from "./types";
+
+export {
+  createOpenAiTtsProvider,
+  isSpeakableText,
+} from "./tts";
+export type { OpenAiTtsProviderOptions } from "./tts";
