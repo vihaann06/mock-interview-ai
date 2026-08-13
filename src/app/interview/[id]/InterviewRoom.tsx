@@ -4,10 +4,10 @@ import { useCallback, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { CodeEditor } from "@/components/interview/CodeEditor";
 import { ConversationPanel } from "@/components/interview/ConversationPanel";
-import { InactivityWatcher } from "@/components/interview/InactivityWatcher";
 import { InterviewControls } from "@/components/interview/InterviewControls";
 import { InterviewTimer } from "@/components/interview/InterviewTimer";
 import { ProblemPanel } from "@/components/interview/ProblemPanel";
+import { VoiceOrchestratorHost } from "@/components/interview/VoiceOrchestratorHost";
 import { getQuestionById } from "@/lib/data/questions";
 import {
   applyHintFromAction,
@@ -24,7 +24,6 @@ import {
   snapshotCode,
   startInterview,
   touchCodeActivity,
-  type LongInactivityPayload,
 } from "@/lib/interview";
 import {
   toLatestExecution,
@@ -113,12 +112,6 @@ export function InterviewRoom() {
     lastExecutionAt: null,
   });
 
-  const handleLongInactivity = useCallback((payload: LongInactivityPayload) => {
-    void payload;
-    // Later: wire to interviewer PROBE vs WAIT via suggestInactivityFollowUp.
-    // Do not speak or call /api/interview/turn automatically from here.
-  }, []);
-
   const handleCodeChange = useCallback((code: string) => {
     setLocalActivity((prev) => ({
       ...prev,
@@ -172,9 +165,13 @@ export function InterviewRoom() {
     });
   }, []);
 
-  const handleSend = useCallback(
-    async (message: string) => {
-      if (!session || !question || pending || session.endedAt) return;
+  /**
+   * Shared submit for typed chat, voice EndOfTurn, and inactivity probe.
+   * Returns interviewer response for the voice orchestrator (TTS / WAIT).
+   */
+  const submitCandidateTranscript = useCallback(
+    async (message: string): Promise<InterviewerResponse | null> => {
+      if (!session || !question || pending || session.endedAt) return null;
 
       setError(null);
       let withCandidate: InterviewSession;
@@ -186,7 +183,7 @@ export function InterviewRoom() {
         });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Could not record message");
-        return;
+        return null;
       }
       setSession(withCandidate);
       setLocalActivity((prev) => ({
@@ -226,7 +223,7 @@ export function InterviewRoom() {
         if (!res.ok || !data.response) {
           // Keep candidate turn; do not wipe session on API failure.
           setError(data.error || `Turn failed (${res.status})`);
-          return;
+          return null;
         }
 
         const reply = data.response;
@@ -239,13 +236,22 @@ export function InterviewRoom() {
             return base;
           }
         });
+        return reply;
       } catch (err) {
         setError(err instanceof Error ? err.message : "Network error");
+        return null;
       } finally {
         setPending(false);
       }
     },
     [session, question, pending],
+  );
+
+  const handleSend = useCallback(
+    async (message: string) => {
+      await submitCandidateTranscript(message);
+    },
+    [submitCandidateTranscript],
   );
 
   if (!question || !session) {
@@ -274,14 +280,15 @@ export function InterviewRoom() {
 
   return (
     <main className="interview-room">
-      <InactivityWatcher
+      <VoiceOrchestratorHost
         startedAt={activityClocks.startedAt}
         endedAt={activityClocks.endedAt}
         lastCandidateTurnAt={activityClocks.lastCandidateTurnAt}
         lastCodeActivityAt={activityClocks.lastCodeActivityAt}
         lastExecutionAt={activityClocks.lastExecutionAt}
         enabled={!session.endedAt}
-        onLongInactivity={handleLongInactivity}
+        interviewActive={!session.endedAt}
+        submitCandidateTurn={submitCandidateTranscript}
       />
       <div className="interview-topbar">
         <h1>
