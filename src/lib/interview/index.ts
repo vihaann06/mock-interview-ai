@@ -41,3 +41,17 @@ export {
   type CreateSessionInput,
   type RecordCandidateTurnInput,
 } from "./session";
+
+export {
+  LONG_INACTIVITY_MS,
+  INACTIVITY_POLL_MS,
+  getLastActivityAt,
+  isLongInactive,
+  mergeActivityClocks,
+  readSessionActivityClocks,
+  suggestInactivityFollowUp,
+  type InterviewActivityClocks,
+  type InactivityFollowUpAction,
+  type LongInactivityPayload,
+  type LongInactivityReason,
+} from "./inactivity";
