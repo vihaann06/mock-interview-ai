@@ -5,10 +5,12 @@
 
 import type { InterviewEvent } from "@/lib/types/events";
 import type {
+  CandidateTurnPayload,
   InterviewerAction,
   InterviewMessage,
   InterviewSession,
   InterviewStage,
+  LatestExecution,
 } from "@/lib/types/interview";
 import { appendEvent, createEvent } from "./event-logger";
 import {
@@ -18,7 +20,6 @@ import {
   isTerminal,
 } from "./stages";
 
-const SUBSTANTIAL_CODE_DELTA = 24;
 const MAX_HINTS = 3;
 
 function newSessionId(): string {
@@ -72,6 +73,12 @@ export interface CreateSessionInput {
   starterCode: string;
   language?: string;
 }
+
+export type RecordCandidateTurnInput = {
+  transcript: string;
+  codeSnapshot?: string;
+  latestExecution?: LatestExecution | null;
+};
 
 /**
  * Creates an unstarted session at INTRO.
@@ -128,116 +135,190 @@ export function startInterview(session: InterviewSession): InterviewSession {
   );
 }
 
-export function appendCandidateMessage(
+/**
+ * Primary candidate interaction — one turn per send / end-of-speech.
+ * Emits a single `candidate_turn` (not `candidate_message`).
+ */
+export function recordCandidateTurn(
   session: InterviewSession,
-  content: string,
+  input: RecordCandidateTurnInput,
 ): InterviewSession {
   ensureActive(session);
   const timestamp = nowMs();
+  const elapsedMs = elapsedForEvent(session, timestamp);
+  const elapsedSeconds = Math.floor(elapsedMs / 1000);
+  const codeSnapshot = input.codeSnapshot ?? session.code;
+
   const message: InterviewMessage = {
     id: newMessageId(),
     role: "candidate",
-    content,
+    content: input.transcript,
     timestamp,
   };
 
-  const next: InterviewSession = {
+  let next: InterviewSession = {
     ...session,
+    code: input.codeSnapshot !== undefined ? input.codeSnapshot : session.code,
+    lastCandidateTurnAt: timestamp,
     messages: [...session.messages, message],
+  };
+
+  if (input.latestExecution !== undefined) {
+    next = {
+      ...next,
+      latestExecution: input.latestExecution,
+    };
+  }
+
+  const payloadMeta: CandidateTurnPayload = {
+    transcript: input.transcript,
+    codeSnapshot,
+    stage: session.stage,
+    elapsedSeconds,
+    latestExecution:
+      input.latestExecution !== undefined
+        ? input.latestExecution
+        : session.latestExecution,
   };
 
   return withEvent(
     next,
     createEvent(
-      "candidate_message",
+      "candidate_turn",
       session.stage,
-      content,
-      elapsedForEvent(session, timestamp),
+      input.transcript,
+      elapsedMs,
+      {
+        codeSnapshot: payloadMeta.codeSnapshot,
+        elapsedSeconds: payloadMeta.elapsedSeconds,
+        latestExecution: payloadMeta.latestExecution ?? null,
+        stage: payloadMeta.stage,
+      },
     ),
   );
 }
 
-export function appendInterviewerMessage(
+/**
+ * @deprecated Prefer recordCandidateTurn — thin wrapper for compatibility.
+ */
+export function appendCandidateMessage(
   session: InterviewSession,
   content: string,
-  action?: InterviewerAction,
+): InterviewSession {
+  return recordCandidateTurn(session, { transcript: content });
+}
+
+/**
+ * Interviewer turn. WAIT does not append a chat bubble; other actions do.
+ * Emits `interviewer_turn` (not `interviewer_message`).
+ */
+export function recordInterviewerTurn(
+  session: InterviewSession,
+  message: string,
+  action: InterviewerAction,
 ): InterviewSession {
   ensureActive(session);
   const timestamp = nowMs();
-  const message: InterviewMessage = {
+  const elapsedMs = elapsedForEvent(session, timestamp);
+
+  if (action === "WAIT") {
+    return withEvent(
+      session,
+      createEvent("interviewer_turn", session.stage, "", elapsedMs, {
+        action: "WAIT",
+      }),
+    );
+  }
+
+  const chatMessage: InterviewMessage = {
     id: newMessageId(),
     role: "interviewer",
-    content,
+    content: message,
     timestamp,
     action,
   };
 
   const next: InterviewSession = {
     ...session,
-    messages: [...session.messages, message],
+    messages: [...session.messages, chatMessage],
   };
 
   return withEvent(
     next,
+    createEvent("interviewer_turn", session.stage, message, elapsedMs, {
+      action,
+    }),
+  );
+}
+
+/**
+ * @deprecated Prefer recordInterviewerTurn.
+ * When `action` is provided, delegates to recordInterviewerTurn (WAIT adds no chat bubble).
+ */
+export function appendInterviewerMessage(
+  session: InterviewSession,
+  content: string,
+  action?: InterviewerAction,
+): InterviewSession {
+  if (action) {
+    return recordInterviewerTurn(session, content, action);
+  }
+  ensureActive(session);
+  const timestamp = nowMs();
+  const chatMessage: InterviewMessage = {
+    id: newMessageId(),
+    role: "interviewer",
+    content,
+    timestamp,
+  };
+  const next: InterviewSession = {
+    ...session,
+    messages: [...session.messages, chatMessage],
+  };
+  return withEvent(
+    next,
     createEvent(
-      "interviewer_message",
+      "interviewer_turn",
       session.stage,
       content,
       elapsedForEvent(session, timestamp),
-      action ? { action } : undefined,
     ),
   );
 }
 
-function isSubstantialCodeChange(prev: string, next: string): boolean {
-  if (prev === next) return false;
-  const delta = Math.abs(next.length - prev.length);
-  if (delta >= SUBSTANTIAL_CODE_DELTA) return true;
-  // Also treat large in-place edits as substantial (Levenshtein is heavy; use simple overlap).
-  const minLen = Math.min(prev.length, next.length);
-  let same = 0;
-  for (let i = 0; i < minLen; i++) {
-    if (prev[i] === next[i]) same++;
+/**
+ * Live editor activity — updates code + lastCodeActivityAt only.
+ * Does NOT emit code_changed (no keystroke flood).
+ */
+export function touchCodeActivity(
+  session: InterviewSession,
+  code: string,
+): InterviewSession {
+  ensureActive(session);
+  const timestamp = nowMs();
+  if (code === session.code && session.lastCodeActivityAt != null) {
+    return {
+      ...session,
+      lastCodeActivityAt: timestamp,
+    };
   }
-  const changed = Math.max(prev.length, next.length) - same;
-  return changed >= SUBSTANTIAL_CODE_DELTA;
+  return {
+    ...session,
+    code,
+    lastCodeActivityAt: timestamp,
+  };
 }
 
 /**
- * Updates live code. Emits `code_changed` always when different,
- * and `code_snapshot` when the change is substantial.
+ * Updates live code without flooding the event stream.
+ * Redirects to touchCodeActivity (no code_changed).
+ * Use snapshotCode for an explicit code_snapshot event.
  */
 export function updateCode(
   session: InterviewSession,
   code: string,
 ): InterviewSession {
-  ensureActive(session);
-  if (code === session.code) return session;
-
-  const timestamp = nowMs();
-  const elapsed = elapsedForEvent(session, timestamp);
-  let next: InterviewSession = {
-    ...session,
-    code,
-  };
-
-  next = withEvent(
-    next,
-    createEvent("code_changed", session.stage, undefined, elapsed, {
-      language: session.language,
-    }),
-  );
-
-  if (isSubstantialCodeChange(session.code, code)) {
-    next = withEvent(
-      next,
-      createEvent("code_snapshot", session.stage, code, elapsed, {
-        language: session.language,
-      }),
-    );
-  }
-
-  return next;
+  return touchCodeActivity(session, code);
 }
 
 /** Explicit code snapshot (e.g. on blur / stable pause). */
@@ -254,6 +335,34 @@ export function snapshotCode(session: InterviewSession): InterviewSession {
       session.code,
       elapsedForEvent(session, timestamp),
       { language: session.language },
+    ),
+  );
+}
+
+/**
+ * Records a free-form execution run result.
+ * Sets latestExecution / lastExecutionAt and emits execution_run.
+ */
+export function recordExecutionRun(
+  session: InterviewSession,
+  result: LatestExecution,
+): InterviewSession {
+  ensureActive(session);
+  const timestamp = nowMs();
+  const next: InterviewSession = {
+    ...session,
+    latestExecution: result,
+    lastExecutionAt: result.ranAt ?? timestamp,
+  };
+
+  return withEvent(
+    next,
+    createEvent(
+      "execution_run",
+      session.stage,
+      undefined,
+      elapsedForEvent(session, timestamp),
+      { execution: result },
     ),
   );
 }
