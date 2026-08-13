@@ -55,6 +55,11 @@
   max-height: 100%;
 }
 
+.interview-room .conversation-column .conversation-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 .pane-header {
   display: flex;
   align-items: center;
@@ -258,7 +263,7 @@
 }
 
 /* Conversation pane — critical overflow containment */
-.conversation-panel {
+.conversation-column {
   grid-area: conversation;
   display: flex;
   flex-direction: column;
@@ -266,6 +271,94 @@
   height: 100%;
   max-height: 100%;
   overflow: hidden;
+  gap: 0.5rem;
+}
+
+.conversation-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
+}
+
+/* Voice panel — mic + draft transcript (Agent2) */
+.voice-panel {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.55rem 0.75rem 0.65rem;
+  background: var(--surface-solid);
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+}
+
+.voice-panel-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.voice-mic-btn,
+.voice-retry-btn {
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.3rem 0.65rem;
+  border-radius: 0.35rem;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.voice-mic-btn:disabled,
+.voice-retry-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.voice-mic-btn[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent-deep);
+}
+
+.voice-status {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+}
+
+.voice-panel[data-status="candidate_speaking"] .voice-status,
+.voice-panel[data-status="listening"] .voice-status {
+  color: var(--accent-deep);
+}
+
+.voice-panel[data-status="error"] .voice-status {
+  color: #b42318;
+}
+
+.voice-draft {
+  margin: 0;
+  min-height: 1.25rem;
+  font-size: 0.86rem;
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.voice-draft:empty {
+  display: none;
+}
+
+.voice-error {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #b42318;
 }
 
 .conversation-header {
@@ -459,10 +552,16 @@
     height: min(55vh, 28rem);
   }
 
+  .conversation-column {
+    min-height: 22rem;
+    height: min(55vh, 30rem);
+    max-height: 55vh;
+  }
+
   .conversation-panel {
-    min-height: 20rem;
-    height: min(50vh, 26rem);
-    max-height: 50vh;
+    min-height: 0;
+    height: auto;
+    max-height: none;
   }
 }
 
