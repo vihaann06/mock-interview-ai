@@ -10,6 +10,8 @@ export type {
   DeepgramTokenResponse,
 } from "./types";
 
+export { createDeepgramFluxSTT } from "./stt";
+
 export {
   createOpenAiTtsProvider,
   isSpeakableText,
