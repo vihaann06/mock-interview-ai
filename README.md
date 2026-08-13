@@ -13,6 +13,17 @@ Realistic technical interview practice: company-style questions, an AI interview
 
 Still stubbed: voice, evaluator / results scoring.
 
+
+## Pre-voice interview engine
+
+Semantic flow (text today; STT will plug in later):
+
+1. Candidate message → one `candidate_turn` (transcript + code snapshot + latestExecution + stage)
+2. Monaco edits update `lastCodeActivityAt` only (no keystroke event flood)
+3. Run Code → free-form Pyodide → `execution_run` + `session.latestExecution` (no question harness)
+4. Interviewer receives code + execution + stage + hints; structured actions validated; **WAIT** renders no bubble
+5. Local 5-minute inactivity monitor fires `LONG_INACTIVITY` once per quiet period (no auto interviewer call yet)
+
 ## Getting started
 
 ```bash

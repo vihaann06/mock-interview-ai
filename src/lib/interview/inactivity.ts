@@ -68,8 +68,9 @@ export function isLongInactive(
  * PROBE when the candidate appears stuck).
  */
 export function suggestInactivityFollowUp(
-  _payload: LongInactivityPayload,
+  payload: LongInactivityPayload,
 ): InactivityFollowUpAction {
+  void payload;
   return "PROBE";
 }
 

@@ -37,10 +37,15 @@ export function useInterviewInactivity({
 }: UseInterviewInactivityOptions): void {
   const firedForQuietPeriodRef = useRef(false);
   const onLongInactivityRef = useRef(onLongInactivity);
-  onLongInactivityRef.current = onLongInactivity;
-
   const clocksRef = useRef(clocks);
-  clocksRef.current = clocks;
+
+  useEffect(() => {
+    onLongInactivityRef.current = onLongInactivity;
+  }, [onLongInactivity]);
+
+  useEffect(() => {
+    clocksRef.current = clocks;
+  }, [clocks]);
 
   const {
     startedAt,
