@@ -39,11 +39,13 @@ Open [http://localhost:3000](http://localhost:3000).
 
 | Variable | Required | Description |
 | --- | --- | --- |
-| `OPENAI_API_KEY` | Yes (for live interviewer) | API key for OpenAI-compatible Chat Completions |
+| `OPENAI_API_KEY` | Yes (for live interviewer / TTS) | API key for OpenAI Chat Completions and audio speech |
 | `OPENAI_MODEL` | No | Defaults to `gpt-4o-mini` |
 | `OPENAI_BASE_URL` | No | Optional base URL for compatible providers |
+| `OPENAI_TTS_VOICE` | No | Interviewer TTS voice; defaults to `alloy` |
+| `OPENAI_TTS_MODEL` | No | Defaults to `gpt-4o-mini-tts` (falls back to `tts-1`) |
 
-Without `OPENAI_API_KEY`, the interview room UI loads but `/api/interview/turn` returns an error.
+Without `OPENAI_API_KEY`, the interview room UI loads but `/api/interview/turn` and `/api/tts/speak` return an error.
 
 ## Scripts
 
@@ -63,6 +65,7 @@ npm test
 | `/setup` | Redirects to a random `/interview/[id]?company=` for the chosen company |
 | `/interview/[id]` | Interview room (problem, Monaco, chat, timer) |
 | `/api/interview/turn` | LLM interviewer turn (JSON `InterviewerResponse`) |
+| `/api/tts/speak` | OpenAI TTS audio (mp3) for interviewer speech |
 | `/results/[id]` | Hiring-style results (placeholder) |
 
 ## Project layout
@@ -71,12 +74,14 @@ npm test
 src/
   app/
     api/interview/turn/   # OpenAI-compatible interviewer route
+    api/tts/speak/        # OpenAI TTS for interviewer speech
     interview/[id]/      # Interview room UI
   components/interview/   # Monaco editor, chat, controls
   lib/
     types/                # Session, events, questions, evaluation
     interview/            # Session state machine + event logger
     interviewer/          # Prompts, zod schema, hint policy
+    voice/                # Voice contracts + OpenAI TTS provider
     data/                 # Questions + company profiles
     execution/            # Code runner (Pyodide in browser; mock fallback)
 ```
