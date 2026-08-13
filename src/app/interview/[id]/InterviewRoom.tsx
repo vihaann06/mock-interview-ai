@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { CodeEditor } from "@/components/interview/CodeEditor";
 import { ConversationPanel } from "@/components/interview/ConversationPanel";
+import { InactivityWatcher } from "@/components/interview/InactivityWatcher";
 import { InterviewControls } from "@/components/interview/InterviewControls";
 import { InterviewTimer } from "@/components/interview/InterviewTimer";
 import { ProblemPanel } from "@/components/interview/ProblemPanel";
@@ -16,10 +17,13 @@ import {
   createSession,
   endInterview,
   getStageLabel,
+  mergeActivityClocks,
   moveForward,
+  readSessionActivityClocks,
   snapshotCode,
   startInterview,
   updateCode,
+  type LongInactivityPayload,
 } from "@/lib/interview";
 import type {
   InterviewerAction,
@@ -92,8 +96,27 @@ export function InterviewRoom() {
   });
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Local mirrors until session clocks are fully wired by other agents. */
+  const [localActivity, setLocalActivity] = useState<{
+    lastCandidateTurnAt: number | null;
+    lastCodeActivityAt: number | null;
+    lastExecutionAt: number | null;
+  }>({
+    lastCandidateTurnAt: null,
+    lastCodeActivityAt: null,
+    lastExecutionAt: null,
+  });
+
+  const handleLongInactivity = useCallback((_payload: LongInactivityPayload) => {
+    // Later: wire to interviewer PROBE vs WAIT via suggestInactivityFollowUp.
+    // Do not speak or call /api/interview/turn automatically from here.
+  }, []);
 
   const handleCodeChange = useCallback((code: string) => {
+    setLocalActivity((prev) => ({
+      ...prev,
+      lastCodeActivityAt: Date.now(),
+    }));
     setSession((prev) => {
       if (!prev || prev.endedAt) return prev;
       try {
@@ -103,7 +126,6 @@ export function InterviewRoom() {
       }
     });
   }, []);
-
   const handleStableSnapshot = useCallback((code: string) => {
     setSession((prev) => {
       if (!prev || prev.endedAt) return prev;
@@ -140,6 +162,10 @@ export function InterviewRoom() {
         return;
       }
       setSession(withCandidate);
+      setLocalActivity((prev) => ({
+        ...prev,
+        lastCandidateTurnAt: Date.now(),
+      }));
       setPending(true);
 
       try {
@@ -208,8 +234,22 @@ export function InterviewRoom() {
       content: m.content,
     }));
 
+  const activityClocks = mergeActivityClocks(
+    readSessionActivityClocks(session),
+    localActivity,
+  );
+
   return (
     <main className="interview-room">
+      <InactivityWatcher
+        startedAt={activityClocks.startedAt}
+        endedAt={activityClocks.endedAt}
+        lastCandidateTurnAt={activityClocks.lastCandidateTurnAt}
+        lastCodeActivityAt={activityClocks.lastCodeActivityAt}
+        lastExecutionAt={activityClocks.lastExecutionAt}
+        enabled={!session.endedAt}
+        onLongInactivity={handleLongInactivity}
+      />
       <div className="interview-topbar">
         <h1>
           {companyId.charAt(0).toUpperCase() + companyId.slice(1)}-style ·{" "}
