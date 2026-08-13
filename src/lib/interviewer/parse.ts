@@ -1,4 +1,5 @@
 import type { InterviewerResponse } from "@/lib/types/interview";
+import { normalizeWaitMessage } from "./policy";
 import { interviewerResponseSchema } from "./schema";
 import type { ParseResult } from "./types";
 
@@ -45,9 +46,10 @@ export function parseAndValidateInterviewerResponse(
     throw new Error(`Invalid InterviewerResponse: ${detail}`);
   }
 
+  const action = parsed.data.action;
   return {
-    action: parsed.data.action,
-    message: parsed.data.message,
+    action,
+    message: normalizeWaitMessage(action, parsed.data.message),
     suggestedStage: parsed.data.suggestedStage ?? null,
   };
 }

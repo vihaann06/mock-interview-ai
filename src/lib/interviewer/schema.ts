@@ -28,11 +28,25 @@ export const interviewerActionSchema = z.enum([
 /**
  * Zod schema for InterviewerResponse.
  * Models must return JSON matching this shape.
+ *
+ * `message` may be empty (or a single space) when action is WAIT;
+ * otherwise it must be non-empty (min 1).
  */
-export const interviewerResponseSchema = z.object({
-  action: interviewerActionSchema,
-  message: z.string().min(1).max(2000),
-  suggestedStage: interviewStageSchema.nullable().optional(),
-});
+export const interviewerResponseSchema = z
+  .object({
+    action: interviewerActionSchema,
+    message: z.string().max(2000),
+    suggestedStage: interviewStageSchema.nullable().optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.action === "WAIT") return;
+    if (value.message.length < 1) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["message"],
+        message: 'message must be non-empty unless action is "WAIT"',
+      });
+    }
+  });
 
 export type InterviewerResponseParsed = z.infer<typeof interviewerResponseSchema>;

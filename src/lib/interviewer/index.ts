@@ -10,6 +10,11 @@ export {
 } from "./prompt";
 
 export {
+  truncateForPrompt,
+  summarizeLatestExecution,
+} from "./execution-context";
+
+export {
   parseAndValidateInterviewerResponse,
   tryParseInterviewerResponse,
 } from "./parse";
@@ -19,6 +24,7 @@ export {
   isActionAllowed,
   sanitizeAction,
   stripSolutionLeaks,
+  normalizeWaitMessage,
   enforceInterviewerPolicy,
 } from "./policy";
 
@@ -33,7 +39,10 @@ export type {
   InterviewerAction,
   InterviewStage,
   InterviewMessage,
+  LatestExecution,
+  ExecutionStatus,
   InterviewerQuestionContext,
+  InterviewerCandidateTurn,
   InterviewerContextInput,
   ActionPolicyContext,
   ParseResult,
