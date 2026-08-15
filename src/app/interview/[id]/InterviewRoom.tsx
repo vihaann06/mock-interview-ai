@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { CodeEditor } from "@/components/interview/CodeEditor";
 import { ConversationPanel } from "@/components/interview/ConversationPanel";
@@ -15,11 +15,11 @@ import { getQuestionById } from "@/lib/data/questions";
 import {
   applyHintFromAction,
   applyStageAction,
+  buildOpeningMessage,
   createSession,
   endInterview,
   getStageLabel,
   mergeActivityClocks,
-  moveForward,
   readSessionActivityClocks,
   recordCandidateTurn,
   recordExecutionRun,
@@ -81,11 +81,12 @@ export function InterviewRoom() {
   const question = getQuestionById(params.id);
   const { speakInterviewer, stopSpeaking } = useInterviewerSpeech();
   const orchestratorRef = useRef<UseVoiceOrchestratorResult | null>(null);
+  const spokenOpeningRef = useRef(false);
   const [orchestratorReady, setOrchestratorReady] = useState(false);
 
   const opening = useMemo(() => {
     if (!question) return "Problem not found.";
-    return `Let's work through "${question.title}". Take a moment to read the problem. What clarifying questions do you have before we discuss an approach?`;
+    return buildOpeningMessage(question);
   }, [question]);
 
   const [session, setSession] = useState<InterviewSession | null>(() => {
@@ -97,17 +98,19 @@ export function InterviewRoom() {
       language: "python",
     });
     s = startInterview(s);
-    // Move into clarification for the opening prompt.
-    try {
-      s = moveForward(s);
-    } catch {
-      // stay on INTRO if transition fails
-    }
+    // Stay on INTRO for the opening walkthrough; invite clarifying questions.
     s = recordInterviewerTurn(s, opening, "ASK_CLARIFICATION");
     return s;
   });
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  /** Speak the opening once when voice/TTS is ready. */
+  useEffect(() => {
+    if (!orchestratorReady || !opening || spokenOpeningRef.current) return;
+    spokenOpeningRef.current = true;
+    void speakInterviewer(opening);
+  }, [orchestratorReady, opening, speakInterviewer]);
   /** Local mirrors until session clocks are fully wired by other agents. */
   const [localActivity, setLocalActivity] = useState<{
     lastCandidateTurnAt: number | null;
@@ -219,6 +222,7 @@ export function InterviewRoom() {
             session: {
               id: withCandidate.id,
               stage: withCandidate.stage,
+              startedAt: withCandidate.startedAt,
               hintsUsed: withCandidate.hintsUsed,
               code: withCandidate.code,
               messages: withCandidate.messages,
@@ -275,19 +279,19 @@ export function InterviewRoom() {
   );
 
   /**
-   * Spoken EndOfTurn → orchestrator only (barge-in state + one submit + TTS).
-   * Do not also call submitCandidateTranscript here — handleEndOfTurn owns that.
+   * Spoken turn complete → orchestrator only (barge-in state + one submit + TTS).
+   * Do not also call submitCandidateTranscript here — handleSpeechEnded owns that.
    */
   const handleVoiceSubmit = useCallback(async (text: string) => {
     const turn: FinalSpeechTurn = {
       transcript: text,
       endedAt: Date.now(),
     };
-    await orchestratorRef.current?.handleEndOfTurn(turn);
+    await orchestratorRef.current?.handleSpeechEnded(turn);
   }, []);
 
   const handleVoiceTurnStart = useCallback(() => {
-    orchestratorRef.current?.handleStartOfTurn();
+    orchestratorRef.current?.handleSpeechStarted();
   }, []);
 
   if (!question || !session) {

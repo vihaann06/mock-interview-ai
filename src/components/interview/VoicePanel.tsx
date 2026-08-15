@@ -37,7 +37,7 @@ function statusLabel(status: VoiceUiStatus): string {
 
 /**
  * Mic controls + live draft transcript. Does not emit interview events for partials.
- * Confirmed STT EndOfTurn → onSubmitTranscript (one candidate_turn).
+ * Confirmed STT turn completion → onSubmitTranscript (one candidate_turn).
  */
 export function VoicePanel({
   onSubmitTranscript,
@@ -60,10 +60,14 @@ export function VoicePanel({
       onVoiceTurnEnd,
     });
 
+  // Prefer parent interview pending for "Processing"; local status covers
+  // connect/listen/speak. Avoid staying on Processing through long TTS.
   const displayStatus: VoiceUiStatus =
-    pending && status !== "error" && status !== "muted" && status !== "idle"
+    pending && (status === "listening" || status === "candidate_speaking" || status === "processing")
       ? "processing"
-      : status;
+      : status === "processing" && !pending
+        ? "listening"
+        : status;
 
   return (
     <section

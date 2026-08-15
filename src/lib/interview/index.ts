@@ -55,3 +55,5 @@ export {
   type LongInactivityPayload,
   type LongInactivityReason,
 } from "./inactivity";
+
+export { buildOpeningMessage } from "./opening-message";

@@ -4,10 +4,8 @@ export type {
   VoiceConversationState,
   TranscriptUpdate,
   FinalSpeechTurn,
-  FluxTurnEventType,
   StreamingSTTProvider,
   TTSProvider,
-  DeepgramTokenResponse,
 } from "./types";
 
 export {
@@ -22,7 +20,12 @@ export {
 
 export type { OrchestratorEvent, TransitionResult } from "./orchestration";
 
-export { createDeepgramFluxSTT, createStreamingSTT } from "./stt";
+export {
+  createOpenAiRealtimeSTT,
+  createStreamingSTT,
+  DEFAULT_SILENCE_DURATION_MS,
+  REALTIME_TRANSCRIBE_MODEL,
+} from "./stt";
 
 export {
   createOpenAiTtsProvider,

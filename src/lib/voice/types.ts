@@ -17,6 +17,7 @@ export type TtsPlaybackState =
   | "generating"
   | "speaking"
   | "stopped"
+  | "interrupted"
   | "error";
 
 /**
@@ -38,7 +39,7 @@ export interface TranscriptUpdate {
 }
 
 /**
- * Completed spoken turn from STT (Flux EndOfTurn).
+ * Completed spoken turn from STT (confirmed transcript completion).
  * Downstream must create exactly one CANDIDATE_TURN from this.
  */
 export interface FinalSpeechTurn {
@@ -48,13 +49,10 @@ export interface FinalSpeechTurn {
   confidence?: number;
 }
 
-export type FluxTurnEventType =
-  | "StartOfTurn"
-  | "Update"
-  | "EagerEndOfTurn"
-  | "TurnResumed"
-  | "EndOfTurn";
-
+/**
+ * Browser streaming speech-to-text provider.
+ * Partials update drafts only; onTurnEnd is the sole semantic turn signal.
+ */
 export interface StreamingSTTProvider {
   connect(): Promise<void>;
   start(): Promise<void>;
@@ -62,11 +60,9 @@ export interface StreamingSTTProvider {
   disconnect(): Promise<void>;
 
   onTranscriptUpdate(callback: (update: TranscriptUpdate) => void): () => void;
+  /** Candidate speech started (barge-in / UI). */
   onTurnStart(callback: () => void): () => void;
-  /** EagerEndOfTurn — for MVP do NOT create candidate turns from this. */
-  onEagerEndOfTurn?(callback: (draft: TranscriptUpdate) => void): () => void;
-  onTurnResumed?(callback: () => void): () => void;
-  /** Confirmed EndOfTurn — sole trigger for CANDIDATE_TURN from voice. */
+  /** Confirmed end of spoken turn — sole trigger for CANDIDATE_TURN from voice. */
   onTurnEnd(callback: (turn: FinalSpeechTurn) => void): () => void;
   onError(callback: (error: Error) => void): () => void;
 }
@@ -77,11 +73,4 @@ export interface TTSProvider {
   isSpeaking(): boolean;
   getState(): TtsPlaybackState;
   onStateChange?(callback: (state: TtsPlaybackState) => void): () => void;
-}
-
-export interface DeepgramTokenResponse {
-  accessToken: string;
-  expiresIn: number;
-  /** Optional absolute expiry ms epoch */
-  expiresAt?: number;
 }

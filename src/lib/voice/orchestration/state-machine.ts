@@ -8,9 +8,9 @@ import type { VoiceConversationState } from "@/lib/voice/types";
 export type OrchestratorEvent =
   | { type: "START_LISTENING" }
   | { type: "STOP" }
-  /** Flux StartOfTurn — barge-in if interviewer is speaking. */
+  /** Candidate speech started — barge-in if interviewer is speaking. */
   | { type: "START_OF_TURN" }
-  /** Confirmed Flux EndOfTurn only — never EagerEndOfTurn. */
+  /** Confirmed spoken-turn completion only — never partial deltas. */
   | { type: "END_OF_TURN" }
   /** Interviewer returned WAIT (or empty speakable text). */
   | { type: "INTERVIEWER_WAIT" }

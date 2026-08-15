@@ -20,7 +20,7 @@ export interface VoiceOrchestratorHostProps {
   enabled?: boolean;
   interviewActive?: boolean;
   /**
-   * Shared with typed chat / VoicePanel EndOfTurn (Agent2).
+   * Shared with typed chat / VoicePanel speech completion.
    * When omitted, barge-in state still works but submits/probes no-op.
    */
   submitCandidateTurn?: (
@@ -30,7 +30,7 @@ export interface VoiceOrchestratorHostProps {
   speakInterviewer?: (text: string) => Promise<void>;
   stopSpeaking?: () => void;
   onStateChange?: (state: VoiceConversationState) => void;
-  /** Agent2: bind STT StartOfTurn / EndOfTurn to these handlers. */
+  /** Bind STT speech-started / speech-ended to these handlers. */
   onOrchestratorReady?: (api: UseVoiceOrchestratorResult) => void;
 }
 
@@ -43,7 +43,7 @@ async function defaultSubmit(
 
 /**
  * Mount point for voice turn-taking, barge-in, and inactivity probe.
- * Keeps InterviewRoom diffs thin — Agent2 wires STT via onOrchestratorReady.
+ * Keeps InterviewRoom diffs thin — STT wires via onOrchestratorReady.
  */
 export function VoiceOrchestratorHost({
   startedAt,

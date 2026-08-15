@@ -12,7 +12,6 @@ import {
 } from "@/lib/voice/orchestration";
 import type {
   FinalSpeechTurn,
-  TranscriptUpdate,
   TTSProvider,
   VoiceConversationState,
 } from "@/lib/voice/types";
@@ -53,20 +52,19 @@ export interface UseVoiceOrchestratorResult {
   /** Hard stop → IDLE (also stops TTS). */
   stop: () => void;
   /**
-   * Flux StartOfTurn. If TTS is playing, barge-in stops it immediately.
+   * Candidate speech started. If TTS is playing, barge-in stops it immediately.
    */
+  handleSpeechStarted: () => void;
+  /** @deprecated Prefer handleSpeechStarted */
   handleStartOfTurn: () => void;
   /**
-   * Confirmed Flux EndOfTurn only.
+   * Confirmed spoken-turn completion only.
    * Transitions to PROCESSING_TURN, submits candidate turn, then
    * WAIT → LISTENING (no TTS) or message → INTERVIEWER_SPEAKING → TTS → LISTENING.
    */
+  handleSpeechEnded: (turn: FinalSpeechTurn) => Promise<void>;
+  /** @deprecated Prefer handleSpeechEnded */
   handleEndOfTurn: (turn: FinalSpeechTurn) => Promise<void>;
-  /**
-   * Flux EagerEndOfTurn — intentionally a no-op for interviewer invocation.
-   * Agent2 may update draft UI separately; do NOT call this for submit.
-   */
-  handleEagerEndOfTurn: (draft: TranscriptUpdate) => void;
   /**
    * Apply an interviewer response already obtained outside EndOfTurn
    * (e.g. typed chat or inactivity probe). Speaks when appropriate.
@@ -86,7 +84,7 @@ export interface UseVoiceOrchestratorResult {
 
 /**
  * Turn-taking / barge-in orchestrator.
- * EagerEndOfTurn never invokes the interviewer.
+ * Partial transcripts never invoke the interviewer.
  */
 export function useVoiceOrchestrator({
   submitCandidateTurn,
@@ -159,11 +157,21 @@ export function useVoiceOrchestrator({
   const speakText = useCallback(async (text: string) => {
     const trimmed = text.trim();
     if (!trimmed) return;
-    if (speakRef.current) {
-      await speakRef.current(trimmed);
-      return;
+    // Hard cap so a stuck audio element can never freeze EndOfTurn / UI.
+    const speakPromise = speakRef.current
+      ? speakRef.current(trimmed)
+      : ttsRef.current?.speak(trimmed) ?? Promise.resolve();
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        speakPromise,
+        new Promise<void>((resolve) => {
+          timeoutId = setTimeout(resolve, 45_000);
+        }),
+      ]);
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
     }
-    await ttsRef.current?.speak(trimmed);
   }, []);
 
   const startListening = useCallback(() => {
@@ -261,15 +269,6 @@ export function useVoiceOrchestrator({
     [applyInterviewerResponse, dispatch, enabled, interviewActive],
   );
 
-  /**
-   * IMPORTANT: EagerEndOfTurn must NOT invoke the interviewer.
-   * Draft UI updates belong in VoicePanel / useVoiceInput — not here.
-   */
-  const handleEagerEndOfTurn = useCallback((_draft: TranscriptUpdate) => {
-    void _draft;
-    // Intentionally empty — no state change, no submit, no TTS.
-  }, []);
-
   const handleInactivityProbe = useCallback(async () => {
     if (!enabled || !interviewActive) return;
     if (!canProbeInactivity(stateRef.current)) return;
@@ -317,9 +316,10 @@ export function useVoiceOrchestrator({
       state,
       startListening,
       stop,
+      handleSpeechStarted: handleStartOfTurn,
       handleStartOfTurn,
+      handleSpeechEnded: handleEndOfTurn,
       handleEndOfTurn,
-      handleEagerEndOfTurn,
       handleInterviewerResponse,
       handleInactivityProbe,
       canProbeInactivity:
@@ -332,7 +332,6 @@ export function useVoiceOrchestrator({
       stop,
       handleStartOfTurn,
       handleEndOfTurn,
-      handleEagerEndOfTurn,
       handleInterviewerResponse,
       handleInactivityProbe,
       interviewActive,

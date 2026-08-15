@@ -6,9 +6,14 @@ export interface OpenAiTtsProviderOptions {
   endpoint?: string;
 }
 
+const PLAYBACK_TIMEOUT_MS = 60_000;
+
 /**
  * Browser TTSProvider: fetches audio from the server TTS route and plays it.
  * Never holds or requests OPENAI_API_KEY — that stays server-side.
+ *
+ * Important: stop()/cancel must always settle an in-flight speak() promise.
+ * Clearing audio handlers without resolving left the voice UI stuck on Processing.
  */
 export function createOpenAiTtsProvider(
   options: OpenAiTtsProviderOptions = {},
@@ -24,6 +29,11 @@ export function createOpenAiTtsProvider(
   /** Monotonic id so late fetch/play callbacks from a prior speak() are ignored. */
   let utteranceId = 0;
   let disposed = false;
+  let playbackWaiter: {
+    id: number;
+    resolve: () => void;
+    timeoutId: ReturnType<typeof setTimeout>;
+  } | null = null;
 
   const setState = (next: TtsPlaybackState) => {
     if (disposed) return;
@@ -54,13 +64,25 @@ export function createOpenAiTtsProvider(
     audio = null;
   };
 
+  const settlePlayback = (id: number) => {
+    if (!playbackWaiter || playbackWaiter.id !== id) return;
+    clearTimeout(playbackWaiter.timeoutId);
+    const { resolve } = playbackWaiter;
+    playbackWaiter = null;
+    resolve();
+  };
+
   const cancelInFlight = () => {
+    const pendingId = playbackWaiter?.id;
     if (abortController) {
       abortController.abort();
       abortController = null;
     }
     detachAudio();
     revokeObjectUrl();
+    if (pendingId !== undefined) {
+      settlePlayback(pendingId);
+    }
   };
 
   const provider: TTSProvider & { dispose: () => void } = {
@@ -110,45 +132,52 @@ export function createOpenAiTtsProvider(
         const el = new Audio(objectUrl);
         audio = el;
 
-        await new Promise<void>((resolve, reject) => {
+        await new Promise<void>((resolve) => {
           if (id !== utteranceId || disposed) {
             resolve();
             return;
           }
 
+          const timeoutId = setTimeout(() => {
+            if (id !== utteranceId || disposed) {
+              settlePlayback(id);
+              return;
+            }
+            detachAudio();
+            revokeObjectUrl();
+            setState("error");
+            settlePlayback(id);
+          }, PLAYBACK_TIMEOUT_MS);
+
+          playbackWaiter = { id, resolve, timeoutId };
+
           el.onplaying = () => {
             if (id === utteranceId && !disposed) setState("speaking");
           };
           el.onended = () => {
-            if (id !== utteranceId || disposed) {
-              resolve();
-              return;
+            if (id === utteranceId && !disposed) {
+              detachAudio();
+              revokeObjectUrl();
+              setState("idle");
             }
-            detachAudio();
-            revokeObjectUrl();
-            setState("idle");
-            resolve();
+            settlePlayback(id);
           };
           el.onerror = () => {
-            if (id !== utteranceId || disposed) {
-              resolve();
-              return;
+            if (id === utteranceId && !disposed) {
+              detachAudio();
+              revokeObjectUrl();
+              setState("error");
             }
-            detachAudio();
-            revokeObjectUrl();
-            setState("error");
-            reject(new Error("Audio playback failed"));
+            settlePlayback(id);
           };
 
-          void el.play().catch((err: unknown) => {
-            if (id !== utteranceId || disposed) {
-              resolve();
-              return;
+          void el.play().catch(() => {
+            if (id === utteranceId && !disposed) {
+              detachAudio();
+              revokeObjectUrl();
+              setState("error");
             }
-            detachAudio();
-            revokeObjectUrl();
-            setState("error");
-            reject(err instanceof Error ? err : new Error("Audio play rejected"));
+            settlePlayback(id);
           });
         });
       } catch (err) {
@@ -161,6 +190,8 @@ export function createOpenAiTtsProvider(
         if (abortController === controller) {
           abortController = null;
         }
+        // Ensure this utterance never leaves a dangling waiter.
+        settlePlayback(id);
       }
     },
 
@@ -169,12 +200,13 @@ export function createOpenAiTtsProvider(
       utteranceId += 1;
       cancelInFlight();
       if (state === "generating" || state === "speaking") {
-        setState("stopped");
+        // Barge-in / explicit interrupt — expose as interrupted (alias of stopped).
+        setState("interrupted");
       }
     },
 
     isSpeaking(): boolean {
-      return state === "speaking";
+      return state === "speaking" || state === "generating";
     },
 
     getState(): TtsPlaybackState {

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FinalSpeechTurn, TranscriptUpdate } from "@/lib/voice";
-import { createDeepgramFluxSTT } from "@/lib/voice/stt";
+import { createOpenAiRealtimeSTT } from "@/lib/voice/stt";
 
 export type VoiceUiStatus =
   | "idle"
@@ -18,7 +18,7 @@ export interface UseVoiceInputOptions {
   enabled?: boolean;
   /** Shared candidate submit path (typed chat + voice EndOfTurn). */
   onFinalTurn: (turn: FinalSpeechTurn) => void | Promise<void>;
-  /** Agent4 orchestration hooks. */
+  /** Orchestration hooks (barge-in / optional turn end). */
   onVoiceTurnStart?: () => void;
   onVoiceTurnEnd?: (turn: FinalSpeechTurn) => void;
 }
@@ -33,13 +33,19 @@ export interface UseVoiceInputResult {
   retry: () => void;
 }
 
-function permissionMessage(err: unknown): string {
-  if (err instanceof DOMException && err.name === "NotAllowedError") {
-    return "Microphone permission denied. Allow access and retry.";
+function voiceErrorMessage(err: unknown): string {
+  if (err instanceof DOMException) {
+    if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+      return "Microphone permission denied. Allow access in the browser address bar and retry.";
+    }
+    if (err.name === "NotFoundError") {
+      return "No microphone found. Connect a mic and retry.";
+    }
+    return err.message || err.name;
   }
   if (err instanceof Error) {
-    if (/permission|NotAllowed|denied/i.test(err.message)) {
-      return "Microphone permission denied. Allow access and retry.";
+    if (/notallowederror|permission denied|microphone permission/i.test(err.message)) {
+      return "Microphone permission denied. Allow access in the browser address bar and retry.";
     }
     return err.message;
   }
@@ -47,8 +53,8 @@ function permissionMessage(err: unknown): string {
 }
 
 /**
- * Wraps the streaming STT provider (Deepgram Flux when Agent1 lands; TEMP mock otherwise).
- * Partial transcripts are draft-only — only EndOfTurn calls onFinalTurn.
+ * Wraps OpenAI Realtime streaming STT.
+ * Partial transcripts are draft-only — only completed turns call onFinalTurn.
  */
 export function useVoiceInput({
   enabled = true,
@@ -61,7 +67,7 @@ export function useVoiceInput({
   const [error, setError] = useState<string | null>(null);
   const [muted, setMuted] = useState(false);
 
-  const providerRef = useRef<ReturnType<typeof createDeepgramFluxSTT> | null>(
+  const providerRef = useRef<ReturnType<typeof createOpenAiRealtimeSTT> | null>(
     null,
   );
   const mutedRef = useRef(false);
@@ -89,7 +95,7 @@ export function useVoiceInput({
 
   const ensureProvider = useCallback(() => {
     if (!providerRef.current) {
-      providerRef.current = createDeepgramFluxSTT();
+      providerRef.current = createOpenAiRealtimeSTT();
     }
     return providerRef.current;
   }, []);
@@ -112,7 +118,7 @@ export function useVoiceInput({
         setStatus("listening");
       } catch (err) {
         if (gen !== sessionGenRef.current) return;
-        setError(permissionMessage(err));
+        setError(voiceErrorMessage(err));
         setStatus("error");
       }
     },
@@ -171,13 +177,22 @@ export function useVoiceInput({
         onVoiceTurnEndRef.current?.(turn);
 
         try {
-          await onFinalTurnRef.current(turn);
-        } catch (err) {
-          setError(permissionMessage(err));
-          // Keep interview alive — voice error is recoverable.
-        } finally {
+          const done = Promise.resolve(onFinalTurnRef.current(turn));
+          // Release the mic UI lock once the turn is handed off. Waiting on
+          // full orchestrator TTS kept status stuck on "Processing" and
+          // blocked later speech-start / speech-end events.
           processingRef.current = false;
           setDraftTranscript("");
+          if (mutedRef.current) {
+            setStatus("muted");
+          } else if (sessionGenRef.current === gen) {
+            setStatus("listening");
+          }
+          await done;
+        } catch (err) {
+          setError(voiceErrorMessage(err));
+          // Keep interview alive — voice error is recoverable.
+          processingRef.current = false;
           if (mutedRef.current) {
             setStatus("muted");
           } else if (sessionGenRef.current === gen) {
@@ -189,7 +204,7 @@ export function useVoiceInput({
 
     const unsubError = provider.onError((err: Error) => {
       if (mutedRef.current) return;
-      setError(permissionMessage(err));
+      setError(voiceErrorMessage(err));
       setStatus("error");
     });
 
@@ -232,6 +247,12 @@ export function useVoiceInput({
     setError(null);
     mutedRef.current = false;
     setMuted(false);
+    // Force a fresh provider/session after errors.
+    const old = providerRef.current;
+    providerRef.current = null;
+    if (old) {
+      void old.disconnect().catch(() => undefined);
+    }
     const gen = ++sessionGenRef.current;
     void startListening(gen);
   }, [enabled, startListening]);
