@@ -1,4 +1,5 @@
 import Link from "next/link";
+import "./landing.css";
 
 export function Hero() {
   return (
