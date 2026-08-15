@@ -1,7 +1,19 @@
-/* Interview room layout — viewport-locked 3-pane workspace */
+/* Interview room — dark charcoal + teal workspace chrome */
 
 .interview-room {
   --interview-header-offset: 4.5rem;
+  /* Local surfaces: native to dark shell (not light whites inverted) */
+  --room-pane: var(--surface-solid);
+  --room-chrome: var(--surface-elevated, #161d27);
+  --room-inset: color-mix(in srgb, var(--bg-deep, #05070a) 55%, var(--surface-solid));
+  --room-input: var(--bg, #0a0e13);
+  --room-bubble-ai: color-mix(in srgb, var(--ink) 7%, transparent);
+  --room-bubble-you: color-mix(in srgb, var(--accent) 14%, transparent);
+  --room-accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
+  --room-line: var(--line-strong, var(--line));
+  --room-focus: color-mix(in srgb, var(--accent) 35%, transparent);
+  --room-on-accent: #f4fcfd;
+
   display: grid;
   grid-template-columns: minmax(240px, 300px) minmax(0, 1fr) minmax(260px, 340px);
   grid-template-rows: auto minmax(0, 1fr);
@@ -19,6 +31,7 @@
   min-height: 0;
   overflow: hidden;
   box-sizing: border-box;
+  color: var(--ink);
 }
 
 .interview-topbar {
@@ -47,12 +60,13 @@
 .interview-room .problem-panel,
 .interview-room .code-editor,
 .interview-room .conversation-panel {
-  background: var(--surface-solid);
+  background: var(--room-pane);
   border: 1px solid var(--line);
   border-radius: 0.5rem;
   overflow: hidden;
   min-height: 0;
   max-height: 100%;
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--ink) 4%, transparent);
 }
 
 .interview-room .conversation-column .conversation-panel {
@@ -68,7 +82,7 @@
   flex-shrink: 0;
   padding: 0.65rem 0.9rem;
   border-bottom: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.45);
+  background: var(--room-chrome);
 }
 
 .pane-header h2 {
@@ -96,6 +110,8 @@
   overflow-y: auto;
   padding: 0.9rem 1.05rem 1.1rem;
   overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ink-muted) 45%, transparent) transparent;
 }
 
 .problem-title {
@@ -115,8 +131,9 @@
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--accent-deep);
-  background: rgba(14, 124, 134, 0.1);
+  color: var(--accent);
+  background: var(--room-accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
   padding: 0.22rem 0.5rem;
   border-radius: 0.25rem;
   white-space: nowrap;
@@ -183,7 +200,7 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--ink-muted);
-  background: rgba(255, 255, 255, 0.45);
+  background: var(--room-chrome);
   flex-shrink: 0;
 }
 
@@ -199,14 +216,16 @@
   min-height: 0;
   position: relative;
   overflow: hidden;
+  background: var(--room-inset);
 }
 
 .interview-controls-wrap {
   flex-shrink: 0;
   padding: 0.65rem 0.75rem;
-  background: var(--surface-solid);
+  background: var(--room-pane);
   border: 1px solid var(--line);
   border-radius: 0.5rem;
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--ink) 4%, transparent);
 }
 
 .interview-controls {
@@ -220,6 +239,16 @@
 .interview-controls .btn-secondary {
   padding: 0.55rem 1rem;
   font-size: 0.85rem;
+}
+
+.interview-controls .btn-secondary {
+  background: var(--room-chrome);
+  border-color: var(--room-line);
+}
+
+.interview-controls .btn-secondary:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  background: color-mix(in srgb, var(--accent) 8%, var(--room-chrome));
 }
 
 .interview-controls-wrap .run-output {
@@ -259,7 +288,9 @@
   overflow-wrap: anywhere;
   word-break: break-word;
   color: var(--ink-muted);
-  background: transparent;
+  background: var(--room-inset);
+  border: 1px solid var(--line);
+  border-radius: 0.35rem;
 }
 
 /* Conversation pane — critical overflow containment */
@@ -368,7 +399,7 @@
   gap: 0.65rem;
   padding: 0.65rem 0.9rem;
   border-bottom: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.45);
+  background: var(--room-chrome);
   flex-shrink: 0;
 }
 
@@ -386,8 +417,9 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--accent-deep);
-  background: rgba(14, 124, 134, 0.12);
+  color: var(--accent);
+  background: var(--room-accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
   padding: 0.25rem 0.5rem;
   border-radius: 0.25rem;
   white-space: nowrap;
@@ -401,8 +433,11 @@
   padding: 0.85rem 0.9rem;
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
+  gap: 0.75rem;
   overscroll-behavior: contain;
+  background: var(--room-inset);
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ink-muted) 45%, transparent) transparent;
 }
 
 .msg {
@@ -417,7 +452,7 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--ink-muted);
-  margin-bottom: 0.28rem;
+  margin-bottom: 0.35rem;
 }
 
 .msg p {
@@ -428,14 +463,23 @@
   overflow-wrap: anywhere;
   word-break: break-word;
   white-space: pre-wrap;
-}
-
-.msg-candidate p {
-  color: var(--ink);
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.45rem;
+  border: 1px solid var(--line);
 }
 
 .msg-interviewer p {
-  color: var(--ink);
+  background: var(--room-bubble-ai);
+  border-color: var(--line);
+}
+
+.msg-candidate p {
+  background: var(--room-bubble-you);
+  border-color: color-mix(in srgb, var(--accent) 22%, var(--line));
+}
+
+.msg-interviewer .msg-role {
+  color: color-mix(in srgb, var(--accent) 55%, var(--ink-muted));
 }
 
 .conversation-status {
@@ -446,7 +490,7 @@
 
 .conversation-error {
   margin: 0;
-  color: var(--danger);
+  color: var(--danger, #f07167);
   font-size: 0.85rem;
   overflow-wrap: anywhere;
   word-break: break-word;
@@ -457,7 +501,7 @@
   gap: 0.45rem;
   padding: 0.65rem 0.75rem;
   border-top: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.55);
+  background: var(--room-chrome);
   flex-shrink: 0;
 }
 
@@ -467,9 +511,20 @@
   border: 1px solid var(--line);
   border-radius: 0.35rem;
   padding: 0.55rem 0.7rem;
-  background: #fff;
+  background: var(--room-input);
   font: inherit;
   color: var(--ink);
+  outline: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.conversation-compose input::placeholder {
+  color: color-mix(in srgb, var(--ink-muted) 85%, transparent);
+}
+
+.conversation-compose input:focus {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+  box-shadow: 0 0 0 3px var(--room-focus);
 }
 
 .conversation-compose input:disabled {
@@ -483,10 +538,11 @@
   border-radius: 0.35rem;
   padding: 0.55rem 0.9rem;
   background: var(--accent);
-  color: #fff;
+  color: var(--room-on-accent);
   font-weight: 600;
   font-size: 0.88rem;
   cursor: pointer;
+  transition: background 160ms ease, transform 160ms ease;
 }
 
 .conversation-compose button:disabled {
@@ -496,6 +552,10 @@
 
 .conversation-compose button:not(:disabled):hover {
   background: var(--accent-deep);
+}
+
+.conversation-compose button:not(:disabled):active {
+  transform: translateY(1px);
 }
 
 .interview-timer {
@@ -509,7 +569,7 @@
   padding: 0.3rem 0.55rem;
   border: 1px solid var(--line);
   border-radius: 0.35rem;
-  background: rgba(255, 255, 255, 0.55);
+  background: var(--room-chrome);
 }
 
 .timer-dot {
@@ -517,6 +577,7 @@
   height: 0.45rem;
   border-radius: 50%;
   background: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
   animation: pulse 1.8s ease-in-out infinite;
 }
 
@@ -594,5 +655,10 @@
 @media (prefers-reduced-motion: reduce) {
   .timer-dot {
     animation: none;
+  }
+
+  .conversation-compose input,
+  .conversation-compose button {
+    transition: none;
   }
 }
