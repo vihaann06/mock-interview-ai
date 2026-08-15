@@ -6,6 +6,24 @@ export interface HintLadder {
 }
 
 /**
+ * Data-driven interviewer concern for a question.
+ * Generic across problems — used for adaptive probing, not special-cased in code.
+ */
+export interface InterviewerConcernTemplate {
+  /** Stable id, e.g. "sorting-invariant". */
+  id: string;
+  topic: string;
+  /** Patterns / approaches that often indicate this concern. */
+  incorrectPatterns?: string[];
+  /** Escalating probe suggestions (open → targeted → walkthrough). */
+  probeExamples?: string[];
+  /** Concrete inputs that stress the misconception. */
+  counterexamples?: string[];
+  /** Important invariant the candidate should maintain. */
+  invariant?: string;
+}
+
+/**
  * Question bank schema. Enrich deeply for a few MVP questions;
  * other entries may remain lighter stubs.
  */
@@ -33,6 +51,8 @@ export interface Question {
     time: string;
     space: string;
   };
+  /** Optional adaptive-probing metadata (generic; not Merge-Intervals-specific logic). */
+  interviewerConcerns?: InterviewerConcernTemplate[];
 }
 
 export interface CompanyProfile {

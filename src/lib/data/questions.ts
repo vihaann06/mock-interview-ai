@@ -95,6 +95,45 @@ export const questions: Question[] = [
       "two_sum(nums: list[int], target: int) -> list[int]",
     ),
     expectedComplexity: { time: "O(n)", space: "O(n)" },
+    interviewerConcerns: [
+      {
+        id: "nested-loop-complexity",
+        topic: "complexity",
+        incorrectPatterns: [
+          "O(n)",
+          "linear time",
+          "for i in",
+          "for j in",
+          "nested loop",
+          "brute force is O(n)",
+        ],
+        probeExamples: [
+          "You said O(n) — how many pairs does the nested loop check?",
+          "If the outer and inner loops both scan the array, what is the true time complexity?",
+          "Walk through how many complement checks happen for n = 4.",
+        ],
+        counterexamples: ["nums = [1,2,3,4], target = 7"],
+        invariant:
+          "Claiming O(n) requires a single pass with O(1) lookups (e.g. hash map), not nested scans.",
+      },
+      {
+        id: "same-index-reuse",
+        topic: "edge_cases",
+        incorrectPatterns: [
+          "same index",
+          "use the same element twice",
+          "2 * nums[i]",
+          "twice the same",
+        ],
+        probeExamples: [
+          "If 2 * nums[i] equals the target, how do you ensure the two indices differ?",
+          "Where in your map approach do you forbid reusing the current index?",
+        ],
+        counterexamples: ["nums = [3, 3], target = 6", "nums = [3, 2, 4], target = 6"],
+        invariant:
+          "Each element may be used at most once — complement at the same index is invalid.",
+      },
+    ],
   },
   {
     id: "valid-parentheses",
@@ -149,6 +188,25 @@ export const questions: Question[] = [
       "merge(intervals: list[list[int]]) -> list[list[int]]",
     ),
     expectedComplexity: { time: "O(n log n)", space: "O(n)" },
+    interviewerConcerns: [
+      {
+        id: "ordering-invariant",
+        topic: "sorting invariant",
+        incorrectPatterns: [
+          "sort by end",
+          "sorted by end",
+          "end time",
+          "end_time",
+        ],
+        probeExamples: [
+          "Why does that ordering guarantee adjacent comparisons are enough?",
+          "What property must the ordering preserve while you scan?",
+        ],
+        counterexamples: ["[[1,10],[2,3],[4,5]]"],
+        invariant:
+          "After sorting by start, each merge only needs to compare with the current open interval.",
+      },
+    ],
   },
   {
     id: "number-of-islands",

@@ -33,6 +33,7 @@ import {
   type CodeRunResult,
 } from "@/lib/execution";
 import type {
+  CandidateReasoningState,
   InterviewerAction,
   InterviewerResponse,
   InterviewSession,
@@ -48,6 +49,45 @@ function isHintAction(
     action === "GIVE_HINT_2" ||
     action === "GIVE_HINT_3"
   );
+}
+
+const OPENING_FETCH_TIMEOUT_MS = 8000;
+
+/** Replace the seeded INTRO interviewer bubble; do not append a second opening. */
+function replaceOpeningInterviewerMessage(
+  session: InterviewSession,
+  message: string,
+): InterviewSession {
+  if (session.messages.some((m) => m.role === "candidate")) {
+    return session;
+  }
+
+  const idx = session.messages.findIndex((m) => m.role === "interviewer");
+  if (idx < 0) {
+    return recordInterviewerTurn(session, message, "ASK_CLARIFICATION");
+  }
+
+  let replacedEvent = false;
+  const events = session.events.map((event) => {
+    if (
+      !replacedEvent &&
+      event.type === "interviewer_turn" &&
+      event.metadata?.action === "ASK_CLARIFICATION"
+    ) {
+      replacedEvent = true;
+      return { ...event, content: message };
+    }
+    return event;
+  });
+
+  return {
+    ...session,
+    stage: "INTRO",
+    messages: session.messages.map((m, i) =>
+      i === idx ? { ...m, content: message, action: "ASK_CLARIFICATION" as const } : m,
+    ),
+    events,
+  };
 }
 
 function applyInterviewerTurn(
@@ -83,11 +123,13 @@ export function InterviewRoom() {
   const orchestratorRef = useRef<UseVoiceOrchestratorResult | null>(null);
   const spokenOpeningRef = useRef(false);
   const [orchestratorReady, setOrchestratorReady] = useState(false);
+  const [openingSettled, setOpeningSettled] = useState(() => !question);
 
-  const opening = useMemo(() => {
+  const fallbackOpening = useMemo(() => {
     if (!question) return "Problem not found.";
     return buildOpeningMessage(question);
   }, [question]);
+  const openingToSpeakRef = useRef(fallbackOpening);
 
   const [session, setSession] = useState<InterviewSession | null>(() => {
     if (!question) return null;
@@ -98,19 +140,85 @@ export function InterviewRoom() {
       language: "python",
     });
     s = startInterview(s);
-    // Stay on INTRO for the opening walkthrough; invite clarifying questions.
-    s = recordInterviewerTurn(s, opening, "ASK_CLARIFICATION");
+    // Seed fallback immediately so the UI isn't empty; stay on INTRO.
+    s = recordInterviewerTurn(s, fallbackOpening, "ASK_CLARIFICATION");
     return s;
   });
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  /** Speak the opening once when voice/TTS is ready. */
+  /**
+   * Fetch an LLM opening after mount. Seeded fallback stays if the request
+   * fails or times out (~8s). TTS waits until this settles so we speak once.
+   */
   useEffect(() => {
-    if (!orchestratorReady || !opening || spokenOpeningRef.current) return;
+    if (!question) {
+      return;
+    }
+
+    openingToSpeakRef.current = fallbackOpening;
+
+    let cancelled = false;
+    const controller = new AbortController();
+    const timer = window.setTimeout(
+      () => controller.abort(),
+      OPENING_FETCH_TIMEOUT_MS,
+    );
+
+    void (async () => {
+      try {
+        const res = await fetch("/api/interview/opening", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            questionId: question.id,
+            companyId,
+          }),
+          signal: controller.signal,
+        });
+        const data = (await res.json()) as {
+          response?: InterviewerResponse;
+          error?: string;
+        };
+        const message = data.response?.message?.trim();
+        if (!cancelled && res.ok && message) {
+          setSession((prev) => {
+            if (!prev || prev.messages.some((m) => m.role === "candidate")) {
+              return prev;
+            }
+            openingToSpeakRef.current = message;
+            return replaceOpeningInterviewerMessage(prev, message);
+          });
+        }
+      } catch {
+        // Timeout / network — keep seeded fallback.
+      } finally {
+        window.clearTimeout(timer);
+        if (!cancelled) setOpeningSettled(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [question, companyId, fallbackOpening]);
+
+  /** Speak the opening once: after fetch settles AND voice/TTS is ready. */
+  useEffect(() => {
+    if (!orchestratorReady || !openingSettled || spokenOpeningRef.current) {
+      return;
+    }
+    if (session?.messages.some((m) => m.role === "candidate")) {
+      spokenOpeningRef.current = true;
+      return;
+    }
+    const text = openingToSpeakRef.current.trim();
+    if (!text) return;
     spokenOpeningRef.current = true;
-    void speakInterviewer(opening);
-  }, [orchestratorReady, opening, speakInterviewer]);
+    void speakInterviewer(text);
+  }, [orchestratorReady, openingSettled, speakInterviewer, session]);
   /** Local mirrors until session clocks are fully wired by other agents. */
   const [localActivity, setLocalActivity] = useState<{
     lastCandidateTurnAt: number | null;
@@ -231,12 +339,14 @@ export function InterviewRoom() {
               lastCandidateTurnAt: withCandidate.lastCandidateTurnAt,
               lastCodeActivityAt: withCandidate.lastCodeActivityAt,
               lastExecutionAt: withCandidate.lastExecutionAt,
+              reasoningState: withCandidate.reasoningState ?? null,
             },
           }),
         });
 
         const data = (await res.json()) as {
           response?: InterviewerResponse;
+          reasoningState?: CandidateReasoningState | null;
           error?: string;
         };
 
@@ -247,10 +357,13 @@ export function InterviewRoom() {
         }
 
         const reply = data.response;
+        const nextReasoning = data.reasoningState;
         setSession((prev) => {
           const base = prev ?? withCandidate;
           try {
-            return applyInterviewerTurn(base, reply);
+            const applied = applyInterviewerTurn(base, reply);
+            if (nextReasoning === undefined) return applied;
+            return { ...applied, reasoningState: nextReasoning };
           } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to apply reply");
             return base;

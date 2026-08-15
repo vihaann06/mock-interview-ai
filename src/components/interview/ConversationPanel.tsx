@@ -60,7 +60,11 @@ export function ConversationPanel({
     <section className="conversation-panel" aria-label="Interviewer conversation">
       <header className="conversation-header pane-header">
         <h2>Interviewer</h2>
-        <span className="stage-badge">{stageLabel}</span>
+        <span className="stage-badge">
+          {stageLabel === "Introduction" || stageLabel === "Clarification"
+            ? "Live interview"
+            : stageLabel}
+        </span>
       </header>
       <div className="conversation-thread" ref={threadRef}>
         {visibleMessages.map((m, i) => (

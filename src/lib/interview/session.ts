@@ -509,12 +509,33 @@ export function moveForward(session: InterviewSession): InterviewSession {
 /**
  * Apply MOVE_FORWARD or a validated suggestedStage.
  * Never jumps arbitrarily — only next stage or canTransition-validated.
+ *
+ * Early-stage hold: stay in welcome/clarify until an explicit, gated advance.
+ * INTRO may only go to CLARIFICATION (MOVE_FORWARD or suggestedStage CLARIFICATION).
+ * CLARIFICATION advances only on MOVE_FORWARD + suggestedStage APPROACH_DISCUSSION.
  */
 export function applyStageAction(
   session: InterviewSession,
   action: InterviewerAction,
   suggestedStage?: InterviewStage | null,
 ): InterviewSession {
+  if (session.stage === "INTRO") {
+    if (action === "MOVE_FORWARD") {
+      return moveForward(session);
+    }
+    if (suggestedStage === "CLARIFICATION" && canTransition(session.stage, suggestedStage)) {
+      return transitionStage(session, "CLARIFICATION");
+    }
+    return session;
+  }
+
+  if (session.stage === "CLARIFICATION") {
+    if (action === "MOVE_FORWARD" && suggestedStage === "APPROACH_DISCUSSION") {
+      return moveForward(session);
+    }
+    return session;
+  }
+
   if (action === "MOVE_FORWARD") {
     return moveForward(session);
   }

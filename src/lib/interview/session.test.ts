@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyHintFromAction,
   applyHintGiven,
+  applyStageAction,
   assertTransition,
   canTransition,
   createSession,
@@ -207,6 +208,80 @@ describe("code activity — no code_changed flood", () => {
     s = snapshotCode(s);
     expect(s.events.length).toBe(before + 1);
     expect(s.events.at(-1)?.type).toBe("code_snapshot");
+  });
+});
+
+describe("applyStageAction early-stage hold", () => {
+  function startedAt(stage: "INTRO" | "CLARIFICATION" | "APPROACH_DISCUSSION") {
+    let s = startInterview(
+      createSession({
+        companyId: "meta",
+        questionId: "two-sum",
+        starterCode: "",
+      }),
+    );
+    if (stage === "CLARIFICATION" || stage === "APPROACH_DISCUSSION") {
+      s = applyStageAction(s, "MOVE_FORWARD");
+    }
+    if (stage === "APPROACH_DISCUSSION") {
+      s = applyStageAction(s, "MOVE_FORWARD", "APPROACH_DISCUSSION");
+    }
+    expect(s.stage).toBe(stage);
+    return s;
+  }
+
+  it("INTRO MOVE_FORWARD only advances to CLARIFICATION", () => {
+    const s = applyStageAction(startedAt("INTRO"), "MOVE_FORWARD", "CODING");
+    expect(s.stage).toBe("CLARIFICATION");
+  });
+
+  it("INTRO ignores suggested stages past CLARIFICATION", () => {
+    const s = applyStageAction(
+      startedAt("INTRO"),
+      "ASK_CLARIFICATION",
+      "APPROACH_DISCUSSION",
+    );
+    expect(s.stage).toBe("INTRO");
+  });
+
+  it("INTRO allows suggestedStage CLARIFICATION", () => {
+    const s = applyStageAction(
+      startedAt("INTRO"),
+      "ASK_CLARIFICATION",
+      "CLARIFICATION",
+    );
+    expect(s.stage).toBe("CLARIFICATION");
+  });
+
+  it("CLARIFICATION ignores MOVE_FORWARD without suggestedStage", () => {
+    const s = applyStageAction(startedAt("CLARIFICATION"), "MOVE_FORWARD");
+    expect(s.stage).toBe("CLARIFICATION");
+  });
+
+  it("CLARIFICATION does not advance on ASK_CLARIFICATION + suggested approach", () => {
+    const s = applyStageAction(
+      startedAt("CLARIFICATION"),
+      "ASK_CLARIFICATION",
+      "APPROACH_DISCUSSION",
+    );
+    expect(s.stage).toBe("CLARIFICATION");
+  });
+
+  it("CLARIFICATION advances only on MOVE_FORWARD + APPROACH_DISCUSSION", () => {
+    const s = applyStageAction(
+      startedAt("CLARIFICATION"),
+      "MOVE_FORWARD",
+      "APPROACH_DISCUSSION",
+    );
+    expect(s.stage).toBe("APPROACH_DISCUSSION");
+  });
+
+  it("later stages still MOVE_FORWARD / honor suggestedStage", () => {
+    let s = startedAt("APPROACH_DISCUSSION");
+    s = applyStageAction(s, "MOVE_FORWARD");
+    expect(s.stage).toBe("CODING");
+    s = applyStageAction(s, "PROBE", "TESTING");
+    expect(s.stage).toBe("TESTING");
   });
 });
 

@@ -34,6 +34,17 @@ export {
   interviewStageSchema,
 } from "./schema";
 
+export {
+  emptyReasoningState,
+  updateCandidateReasoningState,
+  intentKeyForQuestion,
+  isSemanticallyDuplicateQuestion,
+  primaryUnresolvedConcern,
+  nextEscalationProbe,
+} from "./reasoning-state";
+
+export type { ReasoningUpdateInput } from "./reasoning-state";
+
 export type {
   InterviewerResponse,
   InterviewerAction,
@@ -49,4 +60,18 @@ export type {
   Question,
   HintLadder,
   CompanyProfile,
+  InterviewerConcernTemplate,
+  CandidateClaim,
+  CandidateApproach,
+  InterviewConcern,
+  AskedQuestion,
+  HintRecord,
+  CandidateReasoningState,
+  TopicKey,
+  ClaimCorrectness,
+  ClaimStatus,
+  ConcernSeverity,
+  ConcernStatus,
+  ConcernType,
+  ProbeEscalationLevel,
 } from "./types";

@@ -5,9 +5,12 @@ import {
   assertActionAllowed,
   buildInterviewerContext,
   buildSystemPrompt,
+  enforceInterviewerPolicy,
   tryParseInterviewerResponse,
 } from "@/lib/interviewer";
+import { updateCandidateReasoningState } from "@/lib/interviewer/reasoning-state";
 import type {
+  CandidateReasoningState,
   InterviewMessage,
   InterviewSession,
   InterviewStage,
@@ -27,6 +30,7 @@ interface TurnRequestBody {
     code?: string;
     messages?: InterviewMessage[];
     latestExecution?: LatestExecution | null;
+    reasoningState?: CandidateReasoningState | null;
   };
 }
 
@@ -41,6 +45,20 @@ function isLatestExecution(value: unknown): value is LatestExecution {
     typeof v.status === "string" &&
     typeof v.ranAt === "number" &&
     ["success", "error", "timeout", "not_run"].includes(v.status)
+  );
+}
+
+function isReasoningState(value: unknown): value is CandidateReasoningState {
+  if (!value || typeof value !== "object") return false;
+  const v = value as Record<string, unknown>;
+  return (
+    Array.isArray(v.claims) &&
+    Array.isArray(v.approaches) &&
+    Array.isArray(v.resolvedTopics) &&
+    Array.isArray(v.unresolvedConcerns) &&
+    Array.isArray(v.questionsAlreadyAsked) &&
+    Array.isArray(v.hintsGiven) &&
+    typeof v.updatedAt === "number"
   );
 }
 
@@ -81,17 +99,21 @@ export async function POST(req: Request) {
 
   const company = getCompanyById(companyId);
   const session = body.session ?? {};
-  const stage: InterviewStage = session.stage ?? "CLARIFICATION";
+  const stage: InterviewStage = session.stage ?? "INTRO";
   const hintsUsed = typeof session.hintsUsed === "number" ? session.hintsUsed : 0;
   const code = session.code ?? question.starterCode ?? "";
   const messages = Array.isArray(session.messages) ? session.messages : [];
   const latestExecution = isLatestExecution(session.latestExecution)
     ? session.latestExecution
     : null;
+  const priorReasoningState = isReasoningState(session.reasoningState)
+    ? session.reasoningState
+    : null;
 
   const transcript = messages.map((m) => ({
     role: m.role,
     content: m.content,
+    ...(m.action ? { action: m.action } : {}),
   }));
 
   // Ensure the latest candidate turn is present even if the client omitted it.
@@ -100,6 +122,20 @@ export async function POST(req: Request) {
     transcript.push({ role: "candidate", content: candidateMessage });
   }
 
+  const reasoningUpdateBase = {
+    transcript,
+    candidateMessage,
+    code,
+    question,
+    stage,
+    latestExecution,
+  };
+
+  let reasoningState = updateCandidateReasoningState(
+    priorReasoningState,
+    reasoningUpdateBase,
+  );
+
   const startedAt =
     typeof session.startedAt === "number" && session.startedAt > 0
       ? session.startedAt
@@ -107,6 +143,14 @@ export async function POST(req: Request) {
   const elapsedSeconds = startedAt
     ? Math.max(0, Math.floor((Date.now() - startedAt) / 1000))
     : 0;
+
+  const lastInterviewerMessages = messages
+    .filter((m) => m.role === "interviewer")
+    .slice(-8)
+    .map((m) => ({
+      content: m.content,
+      ...(m.action ? { action: m.action } : {}),
+    }));
 
   const system = buildSystemPrompt(company?.behaviors);
   const user = buildInterviewerContext({
@@ -123,6 +167,7 @@ export async function POST(req: Request) {
       codeSnapshot: code,
       elapsedSeconds,
     },
+    reasoningState,
   });
 
   const client = new OpenAI({
@@ -135,7 +180,7 @@ export async function POST(req: Request) {
   try {
     const completion = await client.chat.completions.create({
       model,
-      temperature: 0.4,
+      temperature: 0.65,
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: system },
@@ -157,13 +202,33 @@ export async function POST(req: Request) {
     return jsonError(`Invalid interviewer JSON: ${parsed.error}`, 502);
   }
 
+  const sanitized = enforceInterviewerPolicy(parsed.value, {
+    hintsUsed,
+    stage,
+    candidateMessage,
+    reasoningState,
+    lastInterviewerMessages,
+  });
+
   try {
-    assertActionAllowed(parsed.value.action, { hintsUsed, stage });
+    assertActionAllowed(sanitized.action, {
+      hintsUsed,
+      stage,
+      candidateMessage,
+      reasoningState,
+      lastInterviewerMessages,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Action not allowed";
     return jsonError(message, 422);
   }
 
+  // Record asked questions after policy sanitization (final spoken text).
+  reasoningState = updateCandidateReasoningState(reasoningState, {
+    ...reasoningUpdateBase,
+    lastInterviewerMessage: sanitized,
+  });
+
   // suggestedStage is returned for the client — advisory only; do not apply server-side.
-  return Response.json({ response: parsed.value });
+  return Response.json({ response: sanitized, reasoningState });
 }
