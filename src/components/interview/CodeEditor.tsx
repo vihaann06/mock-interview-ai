@@ -87,7 +87,7 @@ export function CodeEditor({
           value={value}
           onChange={handleChange}
           onMount={handleMount}
-          theme="vs"
+          theme="vs-dark"
           loading={
             <p className="muted" style={{ padding: "1rem" }}>
               Loading editor…
