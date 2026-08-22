@@ -15,6 +15,9 @@ export const DEFAULT_SPEECH_START_RMS = 0.02;
 /** Latency/accuracy tradeoff for gpt-live-transcribe deltas. */
 export const DEFAULT_TRANSCRIPTION_DELAY = "medium" as const;
 
+/** Max time to wait for ICE candidates before posting the SDP offer. */
+export const ICE_GATHERING_TIMEOUT_MS = 2500;
+
 export interface RealtimeTranscriptionSessionConfig {
   type: "transcription";
   audio: {
@@ -41,7 +44,7 @@ export function resolveSilenceDurationMs(): number {
   return Math.floor(n);
 }
 
-/** Session object nested under client_secrets `{ session: ... }`. */
+/** Session object for transcription (used by /v1/realtime/calls FormData). */
 export function buildRealtimeTranscriptionSession(): RealtimeTranscriptionSessionConfig {
   return {
     type: "transcription",
@@ -58,11 +61,4 @@ export function buildRealtimeTranscriptionSession(): RealtimeTranscriptionSessio
       },
     },
   };
-}
-
-/** Body for POST /v1/realtime/client_secrets */
-export function buildClientSecretRequestBody(): {
-  session: RealtimeTranscriptionSessionConfig;
-} {
-  return { session: buildRealtimeTranscriptionSession() };
 }

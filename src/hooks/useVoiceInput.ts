@@ -118,6 +118,13 @@ export function useVoiceInput({
         setStatus("listening");
       } catch (err) {
         if (gen !== sessionGenRef.current) return;
+        // Strict Mode remount / mute teardown aborts in-flight connect — not a UI error.
+        if (
+          (err instanceof DOMException && err.name === "AbortError") ||
+          (err instanceof Error && /aborted/i.test(err.message))
+        ) {
+          return;
+        }
         setError(voiceErrorMessage(err));
         setStatus("error");
       }

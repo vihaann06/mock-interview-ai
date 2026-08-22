@@ -6,10 +6,10 @@ import type {
 import {
   DEFAULT_SILENCE_DURATION_MS,
   DEFAULT_SPEECH_START_RMS,
+  ICE_GATHERING_TIMEOUT_MS,
 } from "./realtime-config";
 
-const SECRET_ENDPOINT = "/api/realtime/transcribe";
-const REALTIME_CALLS_URL = "https://api.openai.com/v1/realtime/calls";
+const SESSION_ENDPOINT = "/api/realtime/transcribe";
 
 type Listener<T> = (value: T) => void;
 
@@ -24,7 +24,8 @@ interface RealtimeServerEvent {
 /**
  * OpenAI Realtime transcription over WebRTC (gpt-live-transcribe).
  *
- * Auth: server mints ephemeral client secret; browser POSTs SDP to OpenAI.
+ * Auth: browser POSTs SDP to our server; the server proxies to OpenAI
+ * `/v1/realtime/calls` with the permanent API key (unified interface).
  * Turn end: client silence window → input_audio_buffer.commit (server VAD
  * is unsupported for this model).
  */
@@ -38,6 +39,8 @@ class OpenAiRealtimeSTTProvider implements StreamingSTTProvider {
   private sending = false;
   private intentionalClose = false;
   private connectPromise: Promise<void> | null = null;
+  /** Bumps on every teardown so in-flight connect work can abort cleanly. */
+  private connectGeneration = 0;
   private draft = "";
   private turnIndex = 0;
   private speaking = false;
@@ -56,7 +59,12 @@ class OpenAiRealtimeSTTProvider implements StreamingSTTProvider {
     }
     if (this.pc && this.pc.connectionState !== "closed") {
       if (this.connectPromise) return this.connectPromise;
-      return;
+      if (
+        this.pc.connectionState === "connected" ||
+        this.pc.connectionState === "connecting"
+      ) {
+        return;
+      }
     }
     if (this.connectPromise) return this.connectPromise;
 
@@ -85,6 +93,7 @@ class OpenAiRealtimeSTTProvider implements StreamingSTTProvider {
   async disconnect(): Promise<void> {
     this.intentionalClose = true;
     this.sending = false;
+    this.connectGeneration += 1;
     this.teardown();
     this.intentionalClose = false;
   }
@@ -110,38 +119,19 @@ class OpenAiRealtimeSTTProvider implements StreamingSTTProvider {
     return () => this.errorListeners.delete(callback);
   }
 
+  private assertGeneration(gen: number): void {
+    if (gen !== this.connectGeneration) {
+      throw new DOMException("Realtime connect aborted", "AbortError");
+    }
+  }
+
   private async openConnection(): Promise<void> {
     this.intentionalClose = false;
+    const gen = ++this.connectGeneration;
     this.teardownPeerOnly();
 
-    const secretRes = await fetch(SECRET_ENDPOINT, { method: "POST" });
-    const secretBody = await secretRes.text();
-    if (!secretRes.ok) {
-      throw new Error(parseJsonError(secretBody, secretRes.status));
-    }
-    let clientSecret: string;
-    try {
-      const parsed = JSON.parse(secretBody) as {
-        clientSecret?: string;
-        silenceDurationMs?: number;
-      };
-      if (!parsed.clientSecret) {
-        throw new Error("Token response missing clientSecret");
-      }
-      clientSecret = parsed.clientSecret;
-      if (
-        typeof parsed.silenceDurationMs === "number" &&
-        Number.isFinite(parsed.silenceDurationMs)
-      ) {
-        this.silenceMs = Math.min(
-          10_000,
-          Math.max(200, Math.floor(parsed.silenceDurationMs)),
-        );
-      }
-    } catch (err) {
-      if (err instanceof Error && err.message.includes("clientSecret")) throw err;
-      throw new Error("Invalid token response from /api/realtime/transcribe");
-    }
+    await this.refreshSilenceConfig();
+    this.assertGeneration(gen);
 
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: {
@@ -152,10 +142,14 @@ class OpenAiRealtimeSTTProvider implements StreamingSTTProvider {
       },
       video: false,
     });
+    this.assertGeneration(gen);
     this.mediaStream = stream;
 
-    const pc = new RTCPeerConnection();
+    const pc = new RTCPeerConnection({
+      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+    });
     this.pc = pc;
+
     pc.ontrack = () => {
       // Transcription sessions should not play remote audio.
     };
@@ -167,40 +161,63 @@ class OpenAiRealtimeSTTProvider implements StreamingSTTProvider {
     const dc = pc.createDataChannel("oai-events");
     this.dc = dc;
     dc.addEventListener("message", (event) => {
+      if (gen !== this.connectGeneration) return;
       this.handleDataMessage(event.data);
     });
 
     pc.addEventListener("connectionstatechange", () => {
       if (this.intentionalClose) return;
+      if (this.pc !== pc || gen !== this.connectGeneration) return;
       if (pc.connectionState === "failed") {
-        this.emitError(new Error("OpenAI Realtime WebRTC connection failed"));
+        const ice = pc.iceConnectionState;
+        this.emitError(
+          new Error(
+            `OpenAI Realtime WebRTC connection failed (ice=${ice}). Check network/firewall and retry.`,
+          ),
+        );
       }
     });
 
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
-    if (!offer.sdp) {
+    this.assertGeneration(gen);
+
+    await waitForIceGathering(pc, ICE_GATHERING_TIMEOUT_MS);
+    this.assertGeneration(gen);
+
+    const localSdp = pc.localDescription?.sdp;
+    if (!localSdp) {
       throw new Error("Failed to create WebRTC SDP offer");
     }
 
-    const sdpResponse = await fetch(REALTIME_CALLS_URL, {
+    const sdpResponse = await fetch(SESSION_ENDPOINT, {
       method: "POST",
-      body: offer.sdp,
+      body: localSdp,
       headers: {
-        Authorization: `Bearer ${clientSecret}`,
         "Content-Type": "application/sdp",
       },
     });
+    this.assertGeneration(gen);
+
     const answerBody = await sdpResponse.text();
     if (!sdpResponse.ok) {
       this.teardown();
       throw new Error(parseJsonError(answerBody, sdpResponse.status));
     }
 
+    const silenceHeader = sdpResponse.headers.get("X-Silence-Duration-Ms");
+    if (silenceHeader) {
+      const n = Number(silenceHeader);
+      if (Number.isFinite(n)) {
+        this.silenceMs = Math.min(10_000, Math.max(200, Math.floor(n)));
+      }
+    }
+
     await pc.setRemoteDescription({
       type: "answer",
       sdp: answerBody,
     });
+    this.assertGeneration(gen);
 
     this.setupAnalyser(stream);
 
@@ -208,6 +225,25 @@ class OpenAiRealtimeSTTProvider implements StreamingSTTProvider {
       this.setMicEnabled(false);
     } else {
       this.startEnergyMonitor();
+    }
+  }
+
+  private async refreshSilenceConfig(): Promise<void> {
+    try {
+      const res = await fetch(SESSION_ENDPOINT, { method: "GET" });
+      if (!res.ok) return;
+      const parsed = (await res.json()) as { silenceDurationMs?: number };
+      if (
+        typeof parsed.silenceDurationMs === "number" &&
+        Number.isFinite(parsed.silenceDurationMs)
+      ) {
+        this.silenceMs = Math.min(
+          10_000,
+          Math.max(200, Math.floor(parsed.silenceDurationMs)),
+        );
+      }
+    } catch {
+      // Keep default silence window.
     }
   }
 
@@ -434,6 +470,30 @@ class OpenAiRealtimeSTTProvider implements StreamingSTTProvider {
   private emitError(error: Error): void {
     for (const cb of this.errorListeners) cb(error);
   }
+}
+
+function waitForIceGathering(
+  pc: RTCPeerConnection,
+  timeoutMs: number,
+): Promise<void> {
+  if (pc.iceGatheringState === "complete") return Promise.resolve();
+
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      pc.removeEventListener("icegatheringstatechange", onChange);
+      resolve();
+    };
+
+    const onChange = () => {
+      if (pc.iceGatheringState === "complete") finish();
+    };
+
+    pc.addEventListener("icegatheringstatechange", onChange);
+    setTimeout(finish, timeoutMs);
+  });
 }
 
 function parseJsonError(raw: string, status: number): string {

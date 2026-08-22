@@ -45,7 +45,7 @@ Open [http://localhost:3000](http://localhost:3000).
 | `OPENAI_BASE_URL` | No | Optional base URL for compatible providers |
 | `OPENAI_TTS_VOICE` | No | Interviewer TTS voice; defaults to `alloy` |
 | `OPENAI_TTS_MODEL` | No | Defaults to `gpt-4o-mini-tts` (falls back to `tts-1`) |
-| `OPENAI_REALTIME_SILENCE_MS` | No | Server VAD silence window (ms) before a spoken turn completes; default `1400` |
+| `OPENAI_REALTIME_SILENCE_MS` | No | Browser silence window (ms) before committing a spoken turn; default `1400` |
 
 Without `OPENAI_API_KEY`, the interview room UI loads but `/api/interview/turn`, `/api/realtime/transcribe`, and `/api/tts/speak` return errors. Typed chat still loads; voice will fail until the key is set.
 
@@ -56,8 +56,8 @@ Never set `NEXT_PUBLIC_OPENAI_API_KEY` — the permanent key must stay server-si
 Streaming speech-to-text uses OpenAI Realtime with `gpt-live-transcribe` over WebRTC.
 
 1. Set `OPENAI_API_KEY` in `.env.local` (never ship this to the browser).
-2. Browser calls `POST /api/realtime/transcribe` → short-lived `{ clientSecret, silenceDurationMs }`.
-3. Browser opens WebRTC and POSTs its SDP to OpenAI `/v1/realtime/calls` with the ephemeral secret (permanent key never leaves the server).
+2. Browser opens WebRTC, waits for ICE candidates, then `POST`s its SDP to `/api/realtime/transcribe`.
+3. The server forwards that offer (plus the transcription session config) to OpenAI `/v1/realtime/calls` and returns the SDP answer — the permanent key never leaves the server.
 4. Use `createOpenAiRealtimeSTT()` from `@/lib/voice` (or `@/lib/voice/stt`):
    - `connect()` — mint secret, mic + WebRTC to OpenAI
    - `start()` / `stop()` — enable / mute the mic track
@@ -85,7 +85,7 @@ npm test
 | `/interview/[id]` | Interview room (problem, Monaco, chat, timer) |
 | `/api/interview/turn` | LLM interviewer turn (JSON `InterviewerResponse`) |
 | `/api/tts/speak` | OpenAI TTS audio (mp3) for interviewer speech |
-| `/api/realtime/transcribe` | WebRTC SDP proxy for OpenAI Realtime transcription |
+| `/api/realtime/transcribe` | WebRTC SDP proxy (`application/sdp`) + silence config for Realtime STT |
 | `/results/[id]` | Hiring-style results (placeholder) |
 
 ## Project layout
