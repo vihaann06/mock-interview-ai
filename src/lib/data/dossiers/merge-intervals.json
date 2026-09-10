@@ -1,0 +1,107 @@
+{
+  "questionId": "merge-intervals",
+  "generatedAt": "2026-09-10T00:06:24.587Z",
+  "generator": {
+    "model": "gpt-4o",
+    "promptVersion": 2
+  },
+  "clarifications": [
+    "Are intervals sorted initially? No, intervals are not sorted initially.",
+    "Can intervals be adjacent but not overlapping? Yes, adjacent intervals should not be merged.",
+    "What should be returned if there's only one interval? Return the interval itself.",
+    "Can intervals have negative values? Yes, intervals can have negative values.",
+    "Is the input modified in place? No, return a new list.",
+    "What if the input is empty? Return an empty list.",
+    "Are there duplicate intervals? Yes, duplicates are possible and should be merged."
+  ],
+  "expectedApproaches": [
+    "Sort intervals by start time, then iterate and merge, O(n log n) time.",
+    "Use a stack to manage merging intervals, O(n log n) time due to sorting."
+  ],
+  "solutions": [
+    "Sort the intervals by their start times. Initialize an empty list to hold merged intervals. Iterate through the sorted intervals, and for each interval, check if it overlaps with the last interval in the merged list. If it does, merge them by updating the end of the last interval in the merged list. If it doesn't, add the current interval to the merged list."
+  ],
+  "commonMistakes": [
+    "Not sorting intervals before merging.",
+    "Incorrectly merging adjacent but non-overlapping intervals.",
+    "Off-by-one error when updating the end of the merged interval."
+  ],
+  "edgeCases": [
+    "[]",
+    "[[1,3]]",
+    "[[1,4],[2,3]]",
+    "[[1,2],[2,3],[3,4]]",
+    "[[1,5],[2,3],[4,6]]",
+    "all intervals with the same start"
+  ],
+  "hintLadder": [
+    {
+      "level": 1,
+      "text": "What property would allow you to easily compare intervals?"
+    },
+    {
+      "level": 2,
+      "text": "Consider sorting the intervals by their start times."
+    },
+    {
+      "level": 3,
+      "text": "Iterate through sorted intervals and merge them by updating the end time when they overlap."
+    }
+  ],
+  "followups": [
+    "How would you handle intervals arriving in a stream?",
+    "How would you modify the solution for intervals in a distributed system?",
+    "What if you could not sort the intervals?"
+  ],
+  "rubricNotes": [
+    "Strong: Correctly sorts intervals and merges them efficiently.",
+    "Adequate: Merges intervals but with minor inefficiencies or edge case issues.",
+    "Weak: Fails to correctly merge intervals or misses sorting step."
+  ],
+  "expectedComplexity": {
+    "time": "O(n log n)",
+    "space": "O(n)"
+  },
+  "interviewerConcerns": [
+    {
+      "id": "sort-order",
+      "topic": "ordering",
+      "label": "sort order",
+      "incorrectPatterns": [
+        "sort by end",
+        "no sort",
+        "unordered"
+      ],
+      "probeExamples": [
+        "Why did you choose that sort order?",
+        "How does sorting by start time help?",
+        "What happens if the intervals are not sorted?"
+      ],
+      "counterexamples": [
+        "[[1,4],[2,3]]",
+        "[[5,6],[1,2]]"
+      ],
+      "invariant": "Intervals are processed in order of their start times."
+    },
+    {
+      "id": "merge-condition",
+      "topic": "update_logic",
+      "label": "merge condition",
+      "incorrectPatterns": [
+        "adjacent merge",
+        "end equals start",
+        "merge without overlap"
+      ],
+      "probeExamples": [
+        "What condition are you using to merge intervals?",
+        "How do you handle intervals that touch but don't overlap?",
+        "Walk me through merging [[1,2],[2,3]]."
+      ],
+      "counterexamples": [
+        "[[1,2],[2,3]]",
+        "[[1,5],[5,6]]"
+      ],
+      "invariant": "Intervals are merged only if they overlap."
+    }
+  ]
+}

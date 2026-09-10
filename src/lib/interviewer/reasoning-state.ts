@@ -26,6 +26,7 @@ export type ReasoningUpdateInput = {
     interviewerConcerns?: Array<{
       id: string;
       topic: string;
+      label?: string;
       incorrectPatterns?: string[];
       probeExamples?: string[];
       counterexamples?: string[];
@@ -791,7 +792,7 @@ function matchIncorrectPatterns(
       {
         type: "ALGORITHM_CORRECTNESS",
         topic,
-        summary: `Possible issue: ${tmpl.topic}`,
+        summary: `Possible issue: ${tmpl.label ?? tmpl.topic}`,
         severity: "important",
         templateId: tmpl.id,
       },

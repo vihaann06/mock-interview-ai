@@ -1,0 +1,103 @@
+{
+  "questionId": "number-of-islands",
+  "generatedAt": "2026-09-10T00:06:31.621Z",
+  "generator": {
+    "model": "gpt-4o",
+    "promptVersion": 2
+  },
+  "clarifications": [
+    "Are diagonal connections allowed? No, only horizontal and vertical connections.",
+    "Can the grid be empty? No, the constraints specify at least 1x1 grid.",
+    "What is the input type? A 2D list of strings, each being '0' or '1'."
+  ],
+  "expectedApproaches": [
+    "Depth-First Search (DFS) with grid marking, O(m*n) time.",
+    "Breadth-First Search (BFS) with grid marking, O(m*n) time.",
+    "Union-Find data structure, O(m*n) time."
+  ],
+  "solutions": [
+    "Use DFS to explore each '1' and mark connected lands as visited by changing them to '0'. Count each DFS initiation as a new island.",
+    "Use BFS to explore each '1' and mark connected lands as visited by changing them to '0'. Count each BFS initiation as a new island.",
+    "Use Union-Find to group connected lands and count the number of unique roots representing islands."
+  ],
+  "commonMistakes": [
+    "Failing to mark visited nodes, leading to infinite loops.",
+    "Incorrectly handling boundaries, causing index errors.",
+    "Counting diagonal connections as part of the same island."
+  ],
+  "edgeCases": [
+    "[['0']]",
+    "[['1']]",
+    "[['1', '0'], ['0', '1']]",
+    "[['1', '1', '1', '1', '0']]",
+    "[['1', '0', '1', '0', '1']]"
+  ],
+  "hintLadder": [
+    {
+      "level": 1,
+      "text": "How can you ensure you don't count the same piece of land twice?"
+    },
+    {
+      "level": 2,
+      "text": "Consider using a stack or queue to explore all connected lands from a starting point."
+    },
+    {
+      "level": 3,
+      "text": "Try marking each visited land cell as '0' to avoid revisiting."
+    }
+  ],
+  "followups": [
+    "How would you handle a grid with diagonal connections allowed?",
+    "How would you modify your solution to handle a streaming input of grid rows?",
+    "What if the grid was too large to fit into memory?"
+  ],
+  "rubricNotes": [
+    "Strong: Correctly implements DFS or BFS with proper marking and boundary checks.",
+    "Adequate: Correctly implements the main logic but has minor inefficiencies or edge case handling issues.",
+    "Weak: Fails to correctly handle marking or boundary conditions, leading to incorrect island counts."
+  ],
+  "expectedComplexity": {
+    "time": "O(m*n)",
+    "space": "O(m*n)"
+  },
+  "interviewerConcerns": [
+    {
+      "id": "marking-visited",
+      "topic": "update_logic",
+      "label": "marking visited",
+      "incorrectPatterns": [
+        "no marking",
+        "revisit same",
+        "infinite loop"
+      ],
+      "probeExamples": [
+        "How do you ensure each land cell is only processed once?",
+        "What happens if you revisit a cell you've already processed?",
+        "Can you walk me through what happens when you reach a '1'?"
+      ],
+      "counterexamples": [
+        "[['1', '1', '0'], ['1', '0', '1']]"
+      ],
+      "invariant": "Each land cell is marked as visited after being processed."
+    },
+    {
+      "id": "connectivity-logic",
+      "topic": "algorithm_justification",
+      "label": "connectivity logic",
+      "incorrectPatterns": [
+        "diagonal connection",
+        "four neighbors",
+        "all eight directions"
+      ],
+      "probeExamples": [
+        "How do you define an island in terms of connectivity?",
+        "Are diagonal connections considered part of the same island?",
+        "Can you show me how you handle a corner piece of land?"
+      ],
+      "counterexamples": [
+        "[['1', '0'], ['0', '1']]"
+      ],
+      "invariant": "Islands are only formed by horizontal or vertical connections."
+    }
+  ]
+}

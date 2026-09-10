@@ -1,0 +1,107 @@
+{
+  "questionId": "lru-cache",
+  "generatedAt": "2026-09-10T00:06:40.135Z",
+  "generator": {
+    "model": "gpt-4o",
+    "promptVersion": 2
+  },
+  "clarifications": [
+    "What happens if the key is not found in get? Return -1.",
+    "Can capacity be zero? No, capacity is always positive.",
+    "Are keys unique? Yes, each key is unique.",
+    "What if we put a key that already exists? Update its value and mark it as most recently used.",
+    "Is the cache size dynamic? No, it remains fixed at the given capacity.",
+    "What if we exceed the capacity? Evict the least recently used item.",
+    "Are get and put operations expected to be thread-safe? No, assume single-threaded execution."
+  ],
+  "expectedApproaches": [
+    "Naive approach using a list with O(n) operations.",
+    "HashMap with a doubly linked list for O(1) operations."
+  ],
+  "solutions": [
+    "Use a combination of a dictionary and a doubly linked list. The dictionary holds the keys and their corresponding node references in the linked list. The linked list maintains the order of usage, with the head being the most recently used and the tail being the least recently used. This allows both get and put operations to be performed in O(1) time on average."
+  ],
+  "commonMistakes": [
+    "Using a single linked list instead of a doubly linked list.",
+    "Not updating the order of elements on get operations.",
+    "Incorrectly handling the eviction of elements when capacity is exceeded.",
+    "Mismanaging pointers in the doubly linked list leading to incorrect ordering."
+  ],
+  "edgeCases": [
+    "[] with capacity 1",
+    "[get(1)] on an empty cache",
+    "[put(1,1), get(1)]",
+    "[put(1,1), put(2,2), put(3,3)] with capacity 2",
+    "[put(1,1), put(1,2), get(1)]",
+    "[put(1,1), put(2,2), get(1), put(3,3), get(2)]"
+  ],
+  "hintLadder": [
+    {
+      "level": 1,
+      "text": "How can you track the order of usage efficiently?"
+    },
+    {
+      "level": 2,
+      "text": "Consider using a data structure that allows quick updates to both ends."
+    },
+    {
+      "level": 3,
+      "text": "A doubly linked list can help you manage the order of elements for LRU."
+    }
+  ],
+  "followups": [
+    "How would you modify the cache to handle concurrent access?",
+    "What if the cache needed to be persistent across restarts?",
+    "How would you adapt the solution for a distributed system?",
+    "What if the capacity could change dynamically during execution?"
+  ],
+  "rubricNotes": [
+    "Strong: Implements using both dictionary and doubly linked list correctly, achieving O(1) operations.",
+    "Adequate: Uses a correct data structure but has minor inefficiencies or bugs.",
+    "Weak: Fails to use appropriate data structures, leading to incorrect complexity or functionality."
+  ],
+  "expectedComplexity": {
+    "time": "O(1) average for both get and put",
+    "space": "O(capacity)"
+  },
+  "interviewerConcerns": [
+    {
+      "id": "use-of-linked-list",
+      "topic": "data_structure",
+      "label": "use of linked list",
+      "incorrectPatterns": [
+        "single linked list",
+        "array for order",
+        "list append"
+      ],
+      "probeExamples": [
+        "How are you maintaining the order of usage?",
+        "Why did you choose this data structure for ordering?",
+        "Walk me through how you update the order on a get operation."
+      ],
+      "counterexamples": [
+        "[put(1,1), put(2,2), get(1), put(3,3)]"
+      ],
+      "invariant": "The doubly linked list reflects the order of access."
+    },
+    {
+      "id": "eviction-policy",
+      "topic": "update_logic",
+      "label": "eviction policy",
+      "incorrectPatterns": [
+        "remove first",
+        "remove from head",
+        "evict random"
+      ],
+      "probeExamples": [
+        "What happens when the cache is full?",
+        "How do you decide which item to remove?",
+        "Can you show me how eviction works with a full cache?"
+      ],
+      "counterexamples": [
+        "[put(1,1), put(2,2), put(3,3)] with capacity 2"
+      ],
+      "invariant": "The least recently used item is evicted when capacity is exceeded."
+    }
+  ]
+}

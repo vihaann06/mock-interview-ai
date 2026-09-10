@@ -140,16 +140,24 @@ export type ConcernType =
   | "CODE_SPEECH_MISMATCH"
   | "OTHER";
 
-export type TopicKey =
-  | "complexity"
-  | "invariant"
-  | "update_logic"
-  | "edge_cases"
-  | "data_structure"
-  | "algorithm_justification"
-  | "ordering"
-  | "testing"
-  | "other";
+/**
+ * Canonical topic namespace. Runtime list so generators/validators can enforce it —
+ * `resolvedTopics` dedupe keys off these, so an off-list topic degrades to "other"
+ * and makes unrelated concerns collide.
+ */
+export const TOPIC_KEYS = [
+  "complexity",
+  "invariant",
+  "update_logic",
+  "edge_cases",
+  "data_structure",
+  "algorithm_justification",
+  "ordering",
+  "testing",
+  "other",
+] as const;
+
+export type TopicKey = (typeof TOPIC_KEYS)[number];
 
 export interface CandidateClaim {
   id: string;

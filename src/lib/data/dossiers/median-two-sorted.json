@@ -1,0 +1,112 @@
+{
+  "questionId": "median-two-sorted",
+  "generatedAt": "2026-09-10T00:07:13.536Z",
+  "generator": {
+    "model": "gpt-4o",
+    "promptVersion": 2
+  },
+  "clarifications": [
+    "What if one array is empty? The median is the median of the non-empty array.",
+    "Can the arrays have duplicate elements? Yes, duplicates are allowed.",
+    "What if both arrays are empty? This situation is not allowed by the constraints.",
+    "Should the input arrays be modified? No, the input arrays should not be modified.",
+    "What type should the median be returned as? Return the median as a float.",
+    "What if the total number of elements is even? The median is the average of the two middle numbers.",
+    "Are the arrays always sorted? Yes, both input arrays are sorted."
+  ],
+  "expectedApproaches": [
+    "Merge and sort approach with O((m+n) log(m+n)) complexity.",
+    "Two-pointer merge with O(m+n) complexity.",
+    "Binary search on the smaller array with O(log(min(m,n))) complexity."
+  ],
+  "solutions": [
+    "Perform a binary search on the smaller array to partition both arrays such that the left partition contains the same number of elements as the right partition. Adjust the partitions until the maximum of the left partition is less than or equal to the minimum of the right partition. Calculate the median based on the partition sizes and values."
+  ],
+  "commonMistakes": [
+    "Using a simple merge and sort approach, which is not O(log(m+n)).",
+    "Incorrectly handling cases where one array is empty.",
+    "Failing to correctly calculate the median when the total number of elements is even."
+  ],
+  "edgeCases": [
+    "[] and [1]",
+    "[1, 3] and [2]",
+    "[1, 2] and [3, 4]",
+    "[1, 1, 1] and [1, 1, 1]",
+    "[1, 2, 3] and []",
+    "[] and [1, 2, 3, 4, 5]",
+    "[1] and [2, 3, 4, 5, 6]"
+  ],
+  "hintLadder": [
+    {
+      "level": 1,
+      "text": "How might you use the properties of sorted arrays to avoid merging them entirely?"
+    },
+    {
+      "level": 2,
+      "text": "Consider using binary search to find the correct partition point."
+    },
+    {
+      "level": 3,
+      "text": "Try performing a binary search on the smaller array to partition both arrays into halves."
+    }
+  ],
+  "followups": [
+    "How would you handle the problem if the arrays were not sorted?",
+    "What if you had to find the median of more than two arrays?",
+    "How would you adapt your solution for streaming data?",
+    "How would you modify your solution if the arrays were linked lists instead?"
+  ],
+  "rubricNotes": [
+    "Strong: Implements binary search correctly with clear partition logic and handles all edge cases.",
+    "Adequate: Uses binary search but has minor errors in partition logic or edge case handling.",
+    "Weak: Fails to use binary search or implements a merge and sort approach."
+  ],
+  "expectedComplexity": {
+    "time": "O(log(min(m,n)))",
+    "space": "O(1)"
+  },
+  "interviewerConcerns": [
+    {
+      "id": "nested-loop-cost",
+      "topic": "complexity",
+      "label": "nested loop cost",
+      "incorrectPatterns": [
+        "nested for loop",
+        "o(n^2)",
+        "merge and sort"
+      ],
+      "probeExamples": [
+        "Can you explain the time complexity of your approach?",
+        "What is the complexity of merging the arrays?",
+        "How would your solution perform with arrays of size 1000 each?"
+      ],
+      "counterexamples": [
+        "[1, 2, 3] and [4, 5, 6]",
+        "[1, 3] and [2, 4]",
+        "[] and [1, 2, 3, 4, 5]"
+      ],
+      "invariant": "The algorithm must run in O(log(min(m,n))) time."
+    },
+    {
+      "id": "partition-logic",
+      "topic": "algorithm_justification",
+      "label": "partition logic",
+      "incorrectPatterns": [
+        "max of left",
+        "min of right",
+        "partition index"
+      ],
+      "probeExamples": [
+        "How do you determine the correct partition?",
+        "What ensures the left and right partitions are balanced?",
+        "What happens if the partition indices are not correct?"
+      ],
+      "counterexamples": [
+        "[1, 3] and [2]",
+        "[1, 2] and [3, 4]",
+        "[1, 2, 3] and [4, 5, 6]"
+      ],
+      "invariant": "The left partition max must be less than or equal to the right partition min."
+    }
+  ]
+}

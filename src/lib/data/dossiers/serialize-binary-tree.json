@@ -1,0 +1,112 @@
+{
+  "questionId": "serialize-binary-tree",
+  "generatedAt": "2026-09-10T00:07:03.889Z",
+  "generator": {
+    "model": "gpt-4o",
+    "promptVersion": 2
+  },
+  "clarifications": [
+    "Can node values be negative? Yes, they can be between -1000 and 1000.",
+    "Is the tree binary? Yes, it is a binary tree.",
+    "Can the tree be empty? Yes, it can be empty.",
+    "Are duplicate node values allowed? Yes, duplicate values are allowed.",
+    "What should the output format be? The output should be a string that can be deserialized back to the original tree structure.",
+    "Should the output be human-readable? No, readability is not required as long as deserialization works.",
+    "Should the tree structure be preserved exactly? Yes, structure must be identical after deserialization."
+  ],
+  "expectedApproaches": [
+    "Preorder traversal with null markers, O(n) time and space.",
+    "Level-order traversal (BFS) with null markers, O(n) time and space."
+  ],
+  "solutions": [
+    "Use a preorder traversal to serialize the tree, marking null children with a special character. Deserialize by reading the string and reconstructing the tree using the same traversal order.",
+    "Use a level-order traversal to serialize the tree, marking null children with a special character. Deserialize by reading the string and reconstructing the tree level by level."
+  ],
+  "commonMistakes": [
+    "Forgetting to handle null children in serialization.",
+    "Not reconstructing the tree in the correct order during deserialization.",
+    "Using in-order traversal, which does not preserve structure uniquely."
+  ],
+  "edgeCases": [
+    "[]",
+    "[1]",
+    "[1, null, 2]",
+    "[1, 2, 3, null, null, 4, 5]",
+    "All nodes have the same value",
+    "Tree with maximum height",
+    "Tree with only left children"
+  ],
+  "hintLadder": [
+    {
+      "level": 1,
+      "text": "How would you traverse the tree to capture its structure?"
+    },
+    {
+      "level": 2,
+      "text": "Consider using a traversal method that visits nodes in a specific order, like preorder or level-order."
+    },
+    {
+      "level": 3,
+      "text": "Use a special marker to denote null children in your serialized string."
+    }
+  ],
+  "followups": [
+    "How would you handle a tree with additional properties at each node?",
+    "Can you optimize the space usage of your serialization?",
+    "How would you modify your approach for a n-ary tree?",
+    "What if the tree nodes contained strings instead of integers?"
+  ],
+  "rubricNotes": [
+    "Strong: Implements efficient serialization and deserialization with clear handling of nulls.",
+    "Adequate: Correctly serializes and deserializes but may have minor inefficiencies.",
+    "Weak: Fails to preserve tree structure or mishandles null nodes."
+  ],
+  "expectedComplexity": {
+    "time": "O(n)",
+    "space": "O(n)"
+  },
+  "interviewerConcerns": [
+    {
+      "id": "null-marker-usage",
+      "topic": "data_structure",
+      "label": "null marker usage",
+      "incorrectPatterns": [
+        "no null marker",
+        "omit null",
+        "skip null"
+      ],
+      "probeExamples": [
+        "How do you handle null children in your serialization?",
+        "What happens if a node has only one child?",
+        "Show me how you serialize a tree with missing children."
+      ],
+      "counterexamples": [
+        "[1,null,2]",
+        "[1,2,null,3]",
+        "[1,null,null]"
+      ],
+      "invariant": "Each null child is explicitly marked in the serialized output."
+    },
+    {
+      "id": "traversal-choice",
+      "topic": "algorithm_justification",
+      "label": "traversal choice",
+      "incorrectPatterns": [
+        "inorder traversal",
+        "postorder only",
+        "no traversal"
+      ],
+      "probeExamples": [
+        "Why did you choose this traversal method?",
+        "How does your traversal ensure correct reconstruction?",
+        "Walk me through how your traversal handles a complete binary tree."
+      ],
+      "counterexamples": [
+        "[1,2,3,null,4]",
+        "[5,3,8,1,4]",
+        "[2,1,3]"
+      ],
+      "invariant": "The traversal order must allow unique reconstruction of the tree."
+    }
+  ]
+}
