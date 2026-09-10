@@ -311,6 +311,21 @@ export function candidateNeedsSpokenReply(ctx: ActionPolicyContext): boolean {
   );
 }
 
+/**
+ * The action a WAIT must become when the candidate is owed a reply.
+ *
+ * WAIT means "produce no speech this turn". It is correct while a candidate
+ * works in silence and wrong whenever they have just asked something — and the
+ * model reaches for it readily, because answering-then-stopping and staying
+ * silent look like the same instruction from inside a turn.
+ */
+function spokenActionForOwedReply(ctx: ActionPolicyContext): InterviewerAction {
+  const message = candidateText(ctx);
+  if (askedClarifyingQuestion(message)) return "ASK_CLARIFICATION";
+  if (askedForHint(message)) return "PROBE";
+  return "PROBE";
+}
+
 /** WAIT may be silent; every other action must carry speakable text. */
 export function isSpeakableInterviewerResponse(
   response: Pick<InterviewerResponse, "action" | "message">,
@@ -526,9 +541,18 @@ export function enforceInterviewerPolicy(
 
   // Early-stage clamp can fight adaptive PROBE/CHALLENGE — re-apply early
   // sanitize only when still in INTRO/CLARIFICATION so we keep those rules.
-  const action = EARLY_STAGES.has(ctx.stage)
+  const clamped = EARLY_STAGES.has(ctx.stage)
     ? sanitizeAction(sanitizeEarlyStageAction(adaptive.action, ctx), ctx)
     : adaptive.action;
+
+  // Silence is never a valid answer to a question, a hint request, a
+  // validation check, or the long-silence check-in. Without this the
+  // interviewer answered the first clarifying question and then went mute on
+  // every follow-up, because a model-issued WAIT was passed straight through.
+  const action =
+    clamped === "WAIT" && candidateNeedsSpokenReply(ctx)
+      ? spokenActionForOwedReply(ctx)
+      : clamped;
 
   // Only WAIT is allowed to be silent. Any other action whose text was eaten
   // by filler/leak stripping or an escalation rewrite gets a spoken fallback —

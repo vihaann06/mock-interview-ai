@@ -295,10 +295,34 @@ describe("applyStageAction early-stage hold", () => {
     expect(s.stage).toBe("APPROACH_DISCUSSION");
   });
 
-  it("later stages still MOVE_FORWARD / honor suggestedStage", () => {
+  /**
+   * Later stages used to advance on any MOVE_FORWARD, which let an eager model
+   * walk the whole ladder in four turns with nothing written. Advancement now
+   * requires the stage's own work to be on record.
+   */
+  it("holds later stages until the stage's work exists", () => {
     let s = startedAt("APPROACH_DISCUSSION");
+    // No approach stated and no turns spent: MOVE_FORWARD is dropped.
+    s = applyStageAction(s, "MOVE_FORWARD");
+    expect(s.stage).toBe("APPROACH_DISCUSSION");
+    s = applyStageAction(s, "PROBE", "CODING");
+    expect(s.stage).toBe("APPROACH_DISCUSSION");
+  });
+
+  it("advances later stages once the work is on record", () => {
+    let s = startedAt("APPROACH_DISCUSSION");
+    // Two candidate turns in the stage satisfies the approach gate.
+    s = recordCandidateTurn(s, { transcript: "I'd scan once with a hash map." });
+    s = recordCandidateTurn(s, { transcript: "Storing complements as I go." });
     s = applyStageAction(s, "MOVE_FORWARD");
     expect(s.stage).toBe("CODING");
+
+    // Real code plus more than one implementing turn opens TESTING.
+    const code = "def two_sum(nums, target):\n    seen = {}\n    return []\n";
+    s = updateCode(s, code);
+    s = recordCandidateTurn(s, { transcript: "Writing the loop now.", codeSnapshot: code });
+    expect(applyStageAction(s, "MOVE_FORWARD").stage).toBe("CODING");
+    s = recordCandidateTurn(s, { transcript: "Done with the loop.", codeSnapshot: code });
     s = applyStageAction(s, "PROBE", "TESTING");
     expect(s.stage).toBe("TESTING");
   });

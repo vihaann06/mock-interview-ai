@@ -13,6 +13,7 @@ import type {
   LatestExecution,
 } from "@/lib/types/interview";
 import { appendEvent, createEvent } from "./event-logger";
+import { canAdvanceStage } from "./stage-readiness";
 import {
   assertTransition,
   canTransition,
@@ -522,6 +523,11 @@ export function moveForward(session: InterviewSession): InterviewSession {
  * Early-stage hold: stay in welcome/clarify until an explicit, gated advance.
  * INTRO may only go to CLARIFICATION (MOVE_FORWARD or suggestedStage CLARIFICATION).
  * CLARIFICATION advances only on MOVE_FORWARD + suggestedStage APPROACH_DISCUSSION.
+ *
+ * Later-stage hold: every stage from APPROACH_DISCUSSION on also requires the
+ * work that defines it to have happened (`stageAdvanceBlockers`). Without this
+ * an eager MOVE_FORWARD every turn walked the whole ladder in four turns with
+ * no code written.
  */
 export function applyStageAction(
   session: InterviewSession,
@@ -542,6 +548,11 @@ export function applyStageAction(
     if (action === "MOVE_FORWARD" && suggestedStage === "APPROACH_DISCUSSION") {
       return moveForward(session);
     }
+    return session;
+  }
+
+  // Advance only when the current stage's work is actually on record.
+  if (!canAdvanceStage(session)) {
     return session;
   }
 

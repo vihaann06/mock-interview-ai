@@ -687,3 +687,46 @@ describe("speakability helpers", () => {
     ).toBe(false);
   });
 });
+
+describe("WAIT is never an answer to a direct turn", () => {
+  /**
+   * The reported failure: the interviewer answered the first clarifying
+   * question and then went silent on every follow-up. The prompt told it to
+   * "answer, invite more, then WAIT", and a model-issued WAIT was passed
+   * straight through no matter what the candidate had just asked.
+   */
+  it.each([
+    ["INTRO", "Should I assume the input fits in memory?"],
+    ["CLARIFICATION", "Can the array contain duplicates?"],
+    ["APPROACH_DISCUSSION", "Are negative numbers allowed?"],
+    ["CODING", "Can I use a library sort here?"],
+  ] as const)("upgrades WAIT to a spoken reply in %s", (stage, candidateMessage) => {
+    const out = enforceInterviewerPolicy(
+      reply("WAIT", { message: "" }),
+      ctx({ stage, candidateMessage }),
+    );
+    expect(out.action).not.toBe("WAIT");
+    expect(out.message.trim().length).toBeGreaterThan(0);
+  });
+
+  it.each(["I'm stuck", "Is this correct?"])(
+    "upgrades WAIT for %j",
+    (candidateMessage) => {
+      const out = enforceInterviewerPolicy(
+        reply("WAIT", { message: "" }),
+        ctx({ stage: "CODING", candidateMessage }),
+      );
+      expect(out.action).not.toBe("WAIT");
+      expect(out.message.trim().length).toBeGreaterThan(0);
+    },
+  );
+
+  it("still allows WAIT while the candidate works in silence", () => {
+    const out = enforceInterviewerPolicy(
+      reply("WAIT", { message: "" }),
+      ctx({ stage: "CODING", candidateMessage: "ok now I'll add the loop here" }),
+    );
+    expect(out.action).toBe("WAIT");
+    expect(out.message.trim()).toBe("");
+  });
+});
