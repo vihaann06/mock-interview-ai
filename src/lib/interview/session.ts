@@ -230,6 +230,15 @@ export function recordInterviewerTurn(
     );
   }
 
+  // WAIT is the only silent action. An empty message on any other action would
+  // append a bubble the UI hides and TTS skips — dead air with no error. Fail
+  // loudly instead so the caller can surface it.
+  if (message.trim().length === 0) {
+    throw new Error(
+      `Interviewer action ${action} requires a non-empty message (only WAIT may be silent).`,
+    );
+  }
+
   const chatMessage: InterviewMessage = {
     id: newMessageId(),
     role: "interviewer",

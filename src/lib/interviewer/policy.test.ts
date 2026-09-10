@@ -7,13 +7,18 @@ import type {
 } from "@/lib/types/interview";
 import {
   assertActionAllowed,
+  candidateNeedsSpokenReply,
+  ensureSpeakableMessage,
   enforceInterviewerPolicy,
   intentKeyForQuestion,
+  isSilenceCheckIn,
+  isSpeakableInterviewerResponse,
   normalizeWaitMessage,
   sanitizeAction,
   stripFillerPrefixes,
   stripSolutionLeaks,
 } from "./policy";
+import { INACTIVITY_PROBE_MESSAGE } from "@/lib/voice/orchestration/constants";
 import type { ActionPolicyContext } from "./types";
 
 function ctx(
@@ -435,5 +440,250 @@ describe("enforceInterviewerPolicy — adaptive probing", () => {
     );
     expect(out.action).toBe("WAIT");
     expect(out.message).toBe("");
+  });
+});
+
+describe("enforceInterviewerPolicy — dead air (unintended silence)", () => {
+  it("never returns a non-WAIT action with an empty message", () => {
+    // "You mentioned that" is entirely a filler prefix: stripFillerPrefixes
+    // used to reduce it to "", leaving a PROBE that renders no bubble.
+    const out = enforceInterviewerPolicy(
+      reply("PROBE", { message: "You mentioned that" }),
+      ctx({
+        stage: "APPROACH_DISCUSSION",
+        candidateMessage: "I'll use a hash map.",
+      }),
+    );
+    expect(out.action).toBe("PROBE");
+    expect(out.message.trim().length).toBeGreaterThan(0);
+    expect(isSpeakableInterviewerResponse(out)).toBe(true);
+  });
+
+  it("falls back to spoken text when the model sends whitespace-only content", () => {
+    const out = enforceInterviewerPolicy(
+      reply("ASK_CLARIFICATION", { message: " " }),
+      ctx({
+        stage: "CLARIFICATION",
+        candidateMessage: "Can there be duplicates?",
+      }),
+    );
+    expect(out.action).toBe("ASK_CLARIFICATION");
+    expect(out.message.trim().length).toBeGreaterThan(0);
+  });
+
+  it("does not go silent after a direct question flagged as a duplicate", () => {
+    const answer = "Yes, assume the array is sorted ascending.";
+    const prior = asked({
+      id: "q1",
+      text: "Should I assume the array is sorted?",
+      intentKey: intentKeyForQuestion(answer),
+      topic: "ordering",
+    });
+    const out = enforceInterviewerPolicy(
+      reply("ASK_CLARIFICATION", { message: answer }),
+      ctx({
+        stage: "CLARIFICATION",
+        candidateMessage: "Should I assume the array is sorted?",
+        reasoningState: reasoning({
+          questionsAlreadyAsked: [prior],
+          unresolvedConcerns: [],
+        }),
+      }),
+    );
+    expect(out.action).not.toBe("WAIT");
+    expect(out.message.trim().length).toBeGreaterThan(0);
+  });
+
+  it("does not go silent when the answer repeats a recent interviewer message", () => {
+    const out = enforceInterviewerPolicy(
+      reply("ASK_CLARIFICATION", {
+        message: "Yes, the array is sorted ascending.",
+      }),
+      ctx({
+        stage: "CODING",
+        candidateMessage: "Should I assume the array is sorted?",
+        lastInterviewerMessages: [
+          {
+            content: "Is the array sorted ascending?",
+            action: "ASK_CLARIFICATION",
+          },
+        ],
+      }),
+    );
+    expect(out.action).not.toBe("WAIT");
+    expect(out.message.trim().length).toBeGreaterThan(0);
+  });
+
+  it("does not WAIT while coding when the candidate asked for a hint", () => {
+    const out = enforceInterviewerPolicy(
+      reply("PROBE", { message: "What have you tried so far?" }),
+      ctx({
+        stage: "CODING",
+        candidateMessage: "I'm stuck",
+        reasoningState: reasoning(),
+      }),
+    );
+    expect(out.action).toBe("PROBE");
+    expect(out.message).toBe("What have you tried so far?");
+  });
+
+  it("does not WAIT while coding on a validation-seeking turn with no concerns", () => {
+    const out = enforceInterviewerPolicy(
+      reply("PROBE", { message: "What does that return on an empty list?" }),
+      ctx({
+        stage: "CODING",
+        candidateMessage: "Am I on the right track",
+        reasoningState: reasoning(),
+      }),
+    );
+    expect(out.action).not.toBe("WAIT");
+    expect(out.message.trim().length).toBeGreaterThan(0);
+  });
+
+  it("never silences the long-silence check-in turn", () => {
+    expect(isSilenceCheckIn(INACTIVITY_PROBE_MESSAGE)).toBe(true);
+    const out = enforceInterviewerPolicy(
+      reply("PROBE", { message: "How's it going — where are you at?" }),
+      ctx({
+        stage: "CODING",
+        candidateMessage: INACTIVITY_PROBE_MESSAGE,
+        reasoningState: reasoning(),
+      }),
+    );
+    expect(out.action).not.toBe("WAIT");
+    expect(out.message.trim().length).toBeGreaterThan(0);
+  });
+
+  it("still WAITs on productive coding narration (intended silence)", () => {
+    const out = enforceInterviewerPolicy(
+      reply("PROBE", { message: "Why that loop bound?" }),
+      ctx({
+        stage: "CODING",
+        candidateMessage: "Okay, writing the loop now.",
+        reasoningState: reasoning(),
+      }),
+    );
+    expect(out.action).toBe("WAIT");
+    expect(out.message).toBe("");
+  });
+
+  it("still WAITs on a duplicate re-ask with no open concern (intended silence)", () => {
+    const prior = asked({
+      id: "q1",
+      text: "What is the time complexity?",
+      intentKey: intentKeyForQuestion("What is the time complexity?"),
+      topic: "complexity",
+      resolved: true,
+    });
+    const out = enforceInterviewerPolicy(
+      reply("PROBE", { message: "What is the time complexity of that?" }),
+      ctx({
+        stage: "APPROACH_DISCUSSION",
+        candidateMessage: "Hash map gives O(n).",
+        reasoningState: reasoning({ questionsAlreadyAsked: [prior] }),
+      }),
+    );
+    expect(out.action).toBe("WAIT");
+    expect(out.message).toBe("");
+  });
+
+  it("does not silence the welcome/clarify phase on a dedupe rewrite", () => {
+    const out = enforceInterviewerPolicy(
+      reply("ASK_CLARIFICATION", {
+        message: "Any questions about the problem before you start?",
+      }),
+      ctx({
+        stage: "INTRO",
+        candidateMessage: "Sounds good, nothing for now.",
+        lastInterviewerMessages: [
+          {
+            content: "Any questions about the problem before you start?",
+            action: "ASK_CLARIFICATION",
+          },
+        ],
+        reasoningState: reasoning({ unresolvedConcerns: [] }),
+      }),
+    );
+    expect(out.action).not.toBe("WAIT");
+    expect(out.message.trim().length).toBeGreaterThan(0);
+  });
+
+  it("keeps a model-issued WAIT silent", () => {
+    const out = enforceInterviewerPolicy(
+      reply("WAIT", { message: "" }),
+      ctx({
+        stage: "CODING",
+        candidateMessage: "Typing the helper function.",
+        reasoningState: reasoning(),
+      }),
+    );
+    expect(out.action).toBe("WAIT");
+    expect(out.message).toBe("");
+    expect(isSpeakableInterviewerResponse(out)).toBe(true);
+  });
+});
+
+describe("speakability helpers", () => {
+  it("ensureSpeakableMessage backfills every non-WAIT action", () => {
+    const actions: InterviewerResponse["action"][] = [
+      "ACKNOWLEDGE",
+      "PROBE",
+      "ASK_CLARIFICATION",
+      "CHALLENGE_ASSUMPTION",
+      "REQUEST_EXPLANATION",
+      "REQUEST_COMPLEXITY",
+      "GIVE_HINT_1",
+      "GIVE_HINT_2",
+      "GIVE_HINT_3",
+      "REQUEST_TESTING",
+      "MOVE_FORWARD",
+    ];
+    for (const action of actions) {
+      expect(ensureSpeakableMessage(action, "   ").trim().length).toBeGreaterThan(
+        0,
+      );
+    }
+    expect(ensureSpeakableMessage("WAIT", "")).toBe("");
+    expect(ensureSpeakableMessage("PROBE", "Keep going.")).toBe("Keep going.");
+  });
+
+  it("isSpeakableInterviewerResponse allows silence only for WAIT", () => {
+    expect(
+      isSpeakableInterviewerResponse({ action: "WAIT", message: "" }),
+    ).toBe(true);
+    expect(
+      isSpeakableInterviewerResponse({ action: "PROBE", message: " " }),
+    ).toBe(false);
+    expect(
+      isSpeakableInterviewerResponse({ action: "PROBE", message: "Why?" }),
+    ).toBe(true);
+  });
+
+  it("candidateNeedsSpokenReply covers questions, hints, validation, check-ins", () => {
+    expect(
+      candidateNeedsSpokenReply(
+        ctx({ stage: "CODING", candidateMessage: "Is it okay to sort first?" }),
+      ),
+    ).toBe(true);
+    expect(
+      candidateNeedsSpokenReply(
+        ctx({ stage: "CODING", candidateMessage: "Can I get a hint" }),
+      ),
+    ).toBe(true);
+    expect(
+      candidateNeedsSpokenReply(
+        ctx({ stage: "CODING", candidateMessage: "Is this correct" }),
+      ),
+    ).toBe(true);
+    expect(
+      candidateNeedsSpokenReply(
+        ctx({ stage: "CODING", candidateMessage: INACTIVITY_PROBE_MESSAGE }),
+      ),
+    ).toBe(true);
+    expect(
+      candidateNeedsSpokenReply(
+        ctx({ stage: "CODING", candidateMessage: "Writing the loop now." }),
+      ),
+    ).toBe(false);
   });
 });

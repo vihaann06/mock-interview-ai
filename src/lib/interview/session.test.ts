@@ -141,6 +141,25 @@ describe("interviewer_turn WAIT", () => {
     expect(waits[0]?.content).toBe("");
   });
 
+  it("throws instead of appending an invisible bubble for empty non-WAIT text", () => {
+    const s = startInterview(
+      createSession({
+        companyId: "meta",
+        questionId: "two-sum",
+        starterCode: "",
+      }),
+    );
+    // An empty PROBE/ASK_CLARIFICATION would be filtered out of the thread and
+    // skipped by TTS — dead air with no error. Fail loudly instead.
+    expect(() => recordInterviewerTurn(s, "", "PROBE")).toThrow(
+      /non-empty message/i,
+    );
+    expect(() => recordInterviewerTurn(s, "   ", "ASK_CLARIFICATION")).toThrow(
+      /non-empty message/i,
+    );
+    expect(s.messages).toHaveLength(0);
+  });
+
   it("appends a bubble for non-WAIT actions", () => {
     let s = startInterview(
       createSession({

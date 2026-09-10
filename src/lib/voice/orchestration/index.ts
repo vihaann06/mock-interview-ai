@@ -9,6 +9,7 @@ export {
   canAcceptEndOfTurn,
   canProbeInactivity,
   hasSpeakableInterviewerMessage,
+  isUnintendedSilence,
   initialVoiceConversationState,
   reduceVoiceConversation,
   shouldBargeIn,

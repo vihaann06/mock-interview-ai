@@ -8,6 +8,7 @@ import {
   enforceInterviewerPolicy,
   tryParseInterviewerResponse,
 } from "@/lib/interviewer";
+import { isSpeakableInterviewerResponse } from "@/lib/interviewer/policy";
 import { updateCandidateReasoningState } from "@/lib/interviewer/reasoning-state";
 import type {
   CandidateReasoningState,
@@ -221,6 +222,16 @@ export async function POST(req: Request) {
   } catch (err) {
     const message = err instanceof Error ? err.message : "Action not allowed";
     return jsonError(message, 422);
+  }
+
+  // Invariant: only WAIT may be silent. enforceInterviewerPolicy already
+  // substitutes a fallback, so this is a loud last line of defense — better a
+  // visible error in the UI than an interviewer that says nothing at all.
+  if (!isSpeakableInterviewerResponse(sanitized)) {
+    return jsonError(
+      `Interviewer returned ${sanitized.action} with an empty message`,
+      502,
+    );
   }
 
   // Record asked questions after policy sanitization (final spoken text).

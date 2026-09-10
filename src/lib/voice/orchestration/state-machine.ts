@@ -116,3 +116,16 @@ export function hasSpeakableInterviewerMessage(
   if (action === "WAIT") return false;
   return Boolean(message?.trim());
 }
+
+/**
+ * WAIT is deliberate silence. Any other action with nothing to say is a bug
+ * upstream (policy blanked the text) and would look like the interviewer
+ * ignoring the candidate — callers should surface it, not swallow it.
+ */
+export function isUnintendedSilence(
+  action: string | undefined,
+  message: string | null | undefined,
+): boolean {
+  if (action === "WAIT") return false;
+  return !message?.trim();
+}

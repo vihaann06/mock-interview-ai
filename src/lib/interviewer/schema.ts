@@ -40,7 +40,9 @@ export const interviewerResponseSchema = z
   })
   .superRefine((value, ctx) => {
     if (value.action === "WAIT") return;
-    if (value.message.length < 1) {
+    // Trimmed: a whitespace-only message renders no bubble and speaks nothing,
+    // so it is silence with extra steps.
+    if (value.message.trim().length < 1) {
       ctx.addIssue({
         code: "custom",
         path: ["message"],
