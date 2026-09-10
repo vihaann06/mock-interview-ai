@@ -1,0 +1,106 @@
+{
+  "questionId": "course-schedule",
+  "generatedAt": "2026-09-10T00:06:48.129Z",
+  "generator": {
+    "model": "gpt-4o",
+    "promptVersion": 2
+  },
+  "clarifications": [
+    "Are there duplicate prerequisites? No, each prerequisite pair is unique.",
+    "Can there be a course with no prerequisites? Yes, some courses may not require any other courses.",
+    "What should be returned if there are no prerequisites? Return true, as all courses can be finished.",
+    "Are self-dependencies allowed? No, a course cannot be a prerequisite of itself.",
+    "Is the input always valid? Yes, the input will always adhere to the constraints.",
+    "What if numCourses is 1? Return true, as the single course can be completed.",
+    "Can the prerequisites list be empty? Yes, it can be empty, which means no course has prerequisites."
+  ],
+  "expectedApproaches": [
+    "Topological Sort using Kahn's Algorithm with O(V + E) time complexity.",
+    "Depth First Search (DFS) to detect cycles with O(V + E) time complexity."
+  ],
+  "solutions": [
+    "Use Kahn's Algorithm for topological sorting: Initialize an in-degree array for each course. Traverse the prerequisites to fill the in-degree array. Use a queue to collect courses with zero in-degree. Process the queue, reducing in-degrees of dependent courses and adding new zero in-degree courses to the queue. If all courses are processed, return true; otherwise, return false.",
+    "Use Depth First Search (DFS) to detect cycles: Create an adjacency list for the graph. Track visited nodes with three states: unvisited, visiting, and visited. For each unvisited course, perform a DFS. If a cycle is detected during DFS, return false. If all courses are processed without finding a cycle, return true."
+  ],
+  "commonMistakes": [
+    "Not checking for cycles in the graph.",
+    "Incorrectly updating in-degrees in Kahn's Algorithm.",
+    "Failing to mark nodes as visited in DFS, leading to infinite loops.",
+    "Assuming all courses must have prerequisites."
+  ],
+  "edgeCases": [
+    "[]",
+    "[[0,1],[1,0]]",
+    "[[1,0]]",
+    "numCourses = 1",
+    "prerequisites with no dependencies"
+  ],
+  "hintLadder": [
+    {
+      "level": 1,
+      "text": "What graph-based approach could help determine if all courses can be completed?"
+    },
+    {
+      "level": 2,
+      "text": "Consider using a topological sort or cycle detection to solve this problem."
+    },
+    {
+      "level": 3,
+      "text": "Try maintaining an in-degree array and using a queue to process courses with zero prerequisites."
+    }
+  ],
+  "followups": [
+    "How would you handle this problem if courses could be added or removed dynamically?",
+    "What if each course had a varying number of credits, and you wanted to maximize credits while still completing all courses?",
+    "How would you modify your solution to return the order in which courses should be taken?"
+  ],
+  "rubricNotes": [
+    "Strong: Correctly implements topological sort or DFS with clear understanding of cycle detection.",
+    "Adequate: Implements a working solution but may have minor inefficiencies or misunderstandings.",
+    "Weak: Fails to detect cycles or incorrectly processes the graph, leading to incorrect results."
+  ],
+  "expectedComplexity": {
+    "time": "O(V + E)",
+    "space": "O(V + E)"
+  },
+  "interviewerConcerns": [
+    {
+      "id": "cycle-detection",
+      "topic": "algorithm_justification",
+      "label": "cycle detection",
+      "incorrectPatterns": [
+        "no cycle check",
+        "assume acyclic",
+        "all courses must have prerequisites"
+      ],
+      "probeExamples": [
+        "How do you ensure there are no cycles in the course dependencies?",
+        "What happens if there's a cycle in the prerequisites?",
+        "Can you walk through your logic with prerequisites [[0,1],[1,0]]?"
+      ],
+      "counterexamples": [
+        "[[0,1],[1,0]]"
+      ],
+      "invariant": "The graph must be acyclic for all courses to be completed."
+    },
+    {
+      "id": "in-degree-management",
+      "topic": "update_logic",
+      "label": "in-degree management",
+      "incorrectPatterns": [
+        "wrong in-degree update",
+        "queue not updated",
+        "incorrectly processed node"
+      ],
+      "probeExamples": [
+        "How do you manage the in-degrees of courses during processing?",
+        "What ensures that your queue always contains the correct courses?",
+        "Can you explain how you update the in-degrees with prerequisites [[1,0],[2,0]]?"
+      ],
+      "counterexamples": [
+        "[[1,0],[2,0]]"
+      ],
+      "invariant": "In-degrees must accurately reflect the number of unmet prerequisites for each course."
+    }
+  ]
+}

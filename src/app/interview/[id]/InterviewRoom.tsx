@@ -52,6 +52,20 @@ function isHintAction(
 }
 
 const OPENING_FETCH_TIMEOUT_MS = 8000;
+/**
+ * Hard cap on a turn request. Without it a hung LLM call leaves `pending`
+ * true forever: the compose box stays disabled, the orchestrator stays in
+ * PROCESSING_TURN, and the interview just goes quiet with no error.
+ */
+const TURN_FETCH_TIMEOUT_MS = 30_000;
+
+function isAbortError(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    (err as { name?: unknown }).name === "AbortError"
+  );
+}
 
 /** Replace the seeded INTRO interviewer bubble; do not append a second opening. */
 function replaceOpeningInterviewerMessage(
@@ -296,7 +310,15 @@ export function InterviewRoom() {
   const submitCandidateTranscript = useCallback(
     async (message: string): Promise<InterviewerResponse | null> => {
       const text = message.trim();
-      if (!text || !session || !question || pending || session.endedAt) {
+      if (!text || !session || !question || session.endedAt) {
+        return null;
+      }
+      if (pending) {
+        // A turn is already in flight. Dropping this one silently is
+        // indistinguishable from the interviewer ignoring the candidate.
+        setError(
+          "Still waiting on the interviewer — try that again in a moment.",
+        );
         return null;
       }
 
@@ -319,9 +341,16 @@ export function InterviewRoom() {
       }));
       setPending(true);
 
+      const controller = new AbortController();
+      const timer = window.setTimeout(
+        () => controller.abort(),
+        TURN_FETCH_TIMEOUT_MS,
+      );
+
       try {
         const res = await fetch("/api/interview/turn", {
           method: "POST",
+          signal: controller.signal,
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             candidateMessage: text,
@@ -371,9 +400,16 @@ export function InterviewRoom() {
         });
         return reply;
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Network error");
+        setError(
+          isAbortError(err)
+            ? "The interviewer didn't respond in time. Try sending that again."
+            : err instanceof Error
+              ? err.message
+              : "Network error",
+        );
         return null;
       } finally {
+        window.clearTimeout(timer);
         setPending(false);
       }
     },

@@ -1,0 +1,105 @@
+{
+  "questionId": "two-sum",
+  "generatedAt": "2026-09-10T00:06:09.683Z",
+  "generator": {
+    "model": "gpt-4o",
+    "promptVersion": 2
+  },
+  "clarifications": [
+    "Can there be duplicate numbers in the array? Yes, duplicates are allowed.",
+    "What should be returned if there are multiple solutions? The problem guarantees exactly one solution.",
+    "Can the input array be empty? No, the minimum length is 2.",
+    "Are negative numbers allowed? Yes, negative numbers are allowed.",
+    "Should the indices be returned in sorted order? No, any order is acceptable.",
+    "What if the same number can be used twice to reach the target? You cannot use the same element twice.",
+    "What if the array contains only two elements? The solution will involve these two elements."
+  ],
+  "expectedApproaches": [
+    "Brute force with nested loops, O(n^2) time complexity.",
+    "Hash map for complement lookup, O(n) time complexity."
+  ],
+  "solutions": [
+    "Use a hash map to store each number's index as you iterate through the array. For each number, calculate its complement (target - current number). If the complement is found in the hash map, return the indices of the current number and its complement."
+  ],
+  "commonMistakes": [
+    "Using a nested loop leading to O(n^2) complexity.",
+    "Not checking if the complement is the same element.",
+    "Returning the value instead of indices.",
+    "Not handling negative numbers correctly."
+  ],
+  "edgeCases": [
+    "[1, 2] target 3",
+    "[3, 3] target 6",
+    "[0, 4, 3, 0] target 0",
+    "[1, 5, 5, 1] target 6",
+    "[2, 7, 11, 15] target 9"
+  ],
+  "hintLadder": [
+    {
+      "level": 1,
+      "text": "How can you efficiently check if a number's complement exists in the array?"
+    },
+    {
+      "level": 2,
+      "text": "Consider using a hash map to store numbers and their indices."
+    },
+    {
+      "level": 3,
+      "text": "For each number, calculate its complement and check if it's already in the hash map."
+    }
+  ],
+  "followups": [
+    "How would you extend this to find three numbers that sum to a target?",
+    "What if the array is sorted? Can you optimize further?",
+    "How would you handle multiple solutions?",
+    "Can you solve this problem in a streaming fashion?"
+  ],
+  "rubricNotes": [
+    "Strong: Uses hash map efficiently for O(n) solution, handles edge cases.",
+    "Adequate: Solves with O(n^2) approach, may miss some edge cases.",
+    "Weak: Fails to produce correct indices or uses incorrect logic."
+  ],
+  "expectedComplexity": {
+    "time": "O(n)",
+    "space": "O(n)"
+  },
+  "interviewerConcerns": [
+    {
+      "id": "nested-loop-cost",
+      "topic": "complexity",
+      "label": "nested loop cost",
+      "incorrectPatterns": [
+        "nested for loop",
+        "o(n^2)"
+      ],
+      "probeExamples": [
+        "How does your solution scale with larger input sizes?",
+        "What is the time complexity of your current approach?",
+        "Can you walk me through your solution with nums = [1, 2, 3, 4] and target = 5?"
+      ],
+      "counterexamples": [
+        "[1, 2, 3, 4] target 5"
+      ],
+      "invariant": "Each number's complement is checked in constant time."
+    },
+    {
+      "id": "complement-check",
+      "topic": "update_logic",
+      "label": "complement check",
+      "incorrectPatterns": [
+        "same element twice",
+        "not checking complement",
+        "only checking forward"
+      ],
+      "probeExamples": [
+        "How do you ensure you're not using the same element twice?",
+        "What happens if the complement is the same as the current number?",
+        "Can you show me how your logic handles nums = [3, 3] with target 6?"
+      ],
+      "counterexamples": [
+        "[3, 3] with target 6"
+      ],
+      "invariant": "No element is paired with itself."
+    }
+  ]
+}

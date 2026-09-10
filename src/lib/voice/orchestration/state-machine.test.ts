@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  canAcceptEndOfTurn,
   canProbeInactivity,
   hasSpeakableInterviewerMessage,
+  isUnintendedSilence,
   reduceVoiceConversation,
   shouldBargeIn,
 } from "./state-machine";
@@ -61,5 +63,41 @@ describe("hasSpeakableInterviewerMessage", () => {
     expect(hasSpeakableInterviewerMessage("WAIT", "anything")).toBe(false);
     expect(hasSpeakableInterviewerMessage("PROBE", "  ")).toBe(false);
     expect(hasSpeakableInterviewerMessage("PROBE", "Hello")).toBe(true);
+  });
+});
+
+describe("isUnintendedSilence", () => {
+  it("separates a deliberate WAIT from a blanked non-WAIT message", () => {
+    expect(isUnintendedSilence("WAIT", "")).toBe(false);
+    expect(isUnintendedSilence("WAIT", " ")).toBe(false);
+    expect(isUnintendedSilence("PROBE", "")).toBe(true);
+    expect(isUnintendedSilence("PROBE", "   ")).toBe(true);
+    expect(isUnintendedSilence("PROBE", "Why that bound?")).toBe(false);
+  });
+});
+
+describe("turn-taking always recovers", () => {
+  it("returns to a state that accepts the next candidate turn", () => {
+    // WAIT (intended silence) and a spoken message must both land back in a
+    // state where END_OF_TURN is accepted, otherwise the mic goes dead and the
+    // interviewer looks silent for every following turn too.
+    const afterWait = reduceVoiceConversation("PROCESSING_TURN", {
+      type: "INTERVIEWER_WAIT",
+    }).state;
+    expect(canAcceptEndOfTurn(afterWait)).toBe(true);
+
+    const speaking = reduceVoiceConversation("PROCESSING_TURN", {
+      type: "INTERVIEWER_MESSAGE",
+    }).state;
+    const afterTts = reduceVoiceConversation(speaking, {
+      type: "TTS_DONE",
+    }).state;
+    expect(canAcceptEndOfTurn(afterTts)).toBe(true);
+
+    // Barge-in mid-speech also leaves a turn-accepting state.
+    const bargedIn = reduceVoiceConversation(speaking, {
+      type: "START_OF_TURN",
+    }).state;
+    expect(canAcceptEndOfTurn(bargedIn)).toBe(true);
   });
 });

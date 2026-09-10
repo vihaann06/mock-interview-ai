@@ -11,6 +11,7 @@ import {
   isSemanticallyDuplicateQuestion,
   primaryUnresolvedConcern as primaryUnresolvedConcernFromState,
 } from "@/lib/interviewer/reasoning-state";
+import { INACTIVITY_PROBE_MESSAGE } from "@/lib/voice/orchestration/constants";
 import type { ActionPolicyContext } from "./types";
 
 const HINT_ACTIONS: Record<string, number> = {
@@ -47,6 +48,29 @@ const ESCALATION_WALKTHROUGH =
   "Walk through your approach on a small example that stresses your assumption.";
 const ESCALATION_ASSUMPTION =
   "Take another look at that assumption before continuing.";
+
+/**
+ * Last-resort text per action. WAIT is the *only* action allowed to be silent;
+ * every other action must leave this module with something the UI can render
+ * and TTS can speak, otherwise the turn disappears as dead air.
+ */
+const FALLBACK_MESSAGE_BY_ACTION: Record<InterviewerAction, string> = {
+  ACKNOWLEDGE: "Got it — keep going.",
+  PROBE: "Say more about how that part works.",
+  ASK_CLARIFICATION: "Can you say a bit more about what you mean there?",
+  CHALLENGE_ASSUMPTION: ESCALATION_ASSUMPTION,
+  REQUEST_EXPLANATION: "Walk me through your reasoning step by step.",
+  REQUEST_COMPLEXITY: "What's the time and space complexity of that?",
+  GIVE_HINT_1: "What's the most expensive step in that approach right now?",
+  GIVE_HINT_2: "Think about what you could precompute to avoid that repeated work.",
+  GIVE_HINT_3: "Consider which data structure makes that lookup constant time.",
+  REQUEST_TESTING: "Try that on a small example and tell me what you get.",
+  MOVE_FORWARD: "Good — let's move on.",
+  WAIT: "",
+};
+
+const ANSWER_DIRECT_QUESTION_FALLBACK =
+  "Good question — what would you assume, and how would that change your approach?";
 
 /**
  * Hint ladder: next hint level must equal hintsUsed + 1.
@@ -262,6 +286,54 @@ export function stripFillerPrefixes(message: string): string {
   return out;
 }
 
+/**
+ * The voice layer submits a synthetic transcript after a long silence. Its
+ * whole purpose is to break dead air, so this turn must never resolve to WAIT.
+ */
+export function isSilenceCheckIn(message: string): boolean {
+  const trimmed = message.trim();
+  return trimmed === INACTIVITY_PROBE_MESSAGE || /^\(long silence/i.test(trimmed);
+}
+
+/**
+ * Turns the interviewer is not allowed to answer with silence: the candidate
+ * asked something, asked for a hint, asked for validation, or the interview
+ * itself asked us to check in after a quiet period. WAIT here reads as the
+ * interviewer ignoring the candidate.
+ */
+export function candidateNeedsSpokenReply(ctx: ActionPolicyContext): boolean {
+  const message = candidateText(ctx);
+  return (
+    askedClarifyingQuestion(message) ||
+    askedForHint(message) ||
+    isValidationSeeking(message) ||
+    isSilenceCheckIn(message)
+  );
+}
+
+/** WAIT may be silent; every other action must carry speakable text. */
+export function isSpeakableInterviewerResponse(
+  response: Pick<InterviewerResponse, "action" | "message">,
+): boolean {
+  if (response.action === "WAIT") return true;
+  return response.message.trim().length > 0;
+}
+
+/**
+ * Guarantees a non-WAIT action keeps something to say. Empty text here means
+ * post-processing (filler strip / leak strip / escalation rewrite) ate the
+ * whole message — render nothing and the interviewer goes silently dead.
+ */
+export function ensureSpeakableMessage(
+  action: InterviewerAction,
+  message: string,
+): string {
+  if (action === "WAIT") return message;
+  const trimmed = message.trim();
+  if (trimmed.length > 0) return trimmed;
+  return FALLBACK_MESSAGE_BY_ACTION[action] || FALLBACK_MESSAGE_BY_ACTION.PROBE;
+}
+
 function hasOpenImportantConcern(
   state: CandidateReasoningState | null | undefined,
 ): boolean {
@@ -351,6 +423,7 @@ function applyAdaptivePolicy(
   const primary = primaryUnresolvedConcern(ctx.reasoningState);
   const duplicate = isDuplicateAgainstHistory(nextMessage, ctx);
   const candidate = candidateText(ctx);
+  const owesReply = candidateNeedsSpokenReply(ctx);
 
   // 1) Validation-seeking: do not confirm when an open concern exists.
   if (
@@ -370,8 +443,18 @@ function applyAdaptivePolicy(
   // 2) Duplicate prevention + escalation on vague repeats.
   if (duplicate && nextAction !== "WAIT") {
     if (!primary) {
-      nextAction = "WAIT";
-      nextMessage = "";
+      if (owesReply || EARLY_STAGES.has(ctx.stage)) {
+        // Answering a direct question is not a duplicate re-ask: the dedupe
+        // index only tracks interviewer *questions*. Staying silent here would
+        // drop the answer the candidate is waiting on. WAIT is for a candidate
+        // coding productively, so it is never right in INTRO/CLARIFICATION
+        // either — the candidate is talking, not typing.
+        nextMessage =
+          stripFillerPrefixes(nextMessage) || ANSWER_DIRECT_QUESTION_FALLBACK;
+      } else {
+        nextAction = "WAIT";
+        nextMessage = "";
+      }
     } else {
       const attempts = Math.max(primary.attemptsToProbe, primary.escalationLevel);
       if (attempts >= 1) {
@@ -405,12 +488,14 @@ function applyAdaptivePolicy(
   }
 
   // 3) Productive coding WAIT: don't interrupt short non-question progress.
+  // Never applies when the candidate is owed an answer (question, hint
+  // request, validation check) or when this turn is the long-silence check-in.
   if (
     ctx.stage === "CODING" &&
     nextAction === "PROBE" &&
     isShortNonQuestion(candidate) &&
     !hasOpenImportantConcern(ctx.reasoningState) &&
-    !isValidationSeeking(candidate)
+    !owesReply
   ) {
     nextAction = "WAIT";
     nextMessage = "";
@@ -445,10 +530,13 @@ export function enforceInterviewerPolicy(
     ? sanitizeAction(sanitizeEarlyStageAction(adaptive.action, ctx), ctx)
     : adaptive.action;
 
+  // Only WAIT is allowed to be silent. Any other action whose text was eaten
+  // by filler/leak stripping or an escalation rewrite gets a spoken fallback —
+  // an empty non-WAIT message renders no bubble and speaks nothing.
   const message =
     action === "WAIT"
       ? normalizeWaitMessage(action, adaptive.message)
-      : stripSolutionLeaks(adaptive.message);
+      : ensureSpeakableMessage(action, stripSolutionLeaks(adaptive.message));
 
   return {
     action,

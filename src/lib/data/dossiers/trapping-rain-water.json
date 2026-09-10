@@ -1,0 +1,126 @@
+{
+  "questionId": "trapping-rain-water",
+  "generatedAt": "2026-09-10T00:07:22.746Z",
+  "generator": {
+    "model": "gpt-4o",
+    "promptVersion": 2
+  },
+  "clarifications": [
+    "Can height be negative? No, all heights are non-negative.",
+    "What to return for an empty array? Return 0 as no water can be trapped.",
+    "Are heights guaranteed to fit in memory? Yes, they are within constraints.",
+    "Can there be duplicate heights? Yes, duplicates are allowed.",
+    "Should I account for water at the edges? No, water cannot be trapped at the edges.",
+    "Is the input array mutable? Assume it is not modified.",
+    "What if all bars are the same height? No water will be trapped."
+  ],
+  "expectedApproaches": [
+    "Brute force with nested loops, O(n^2) time.",
+    "Dynamic programming with precomputed max heights, O(n) time and space.",
+    "Two-pointer technique, O(n) time and O(1) space."
+  ],
+  "solutions": [
+    "Use two pointers starting from both ends of the array. Maintain left_max and right_max to store the maximum heights seen so far from the left and right, respectively. Move the pointers towards each other, updating the trapped water based on the minimum of left_max and right_max minus the current height."
+  ],
+  "commonMistakes": [
+    "Using nested loops, leading to O(n^2) time complexity.",
+    "Incorrectly updating left_max and right_max.",
+    "Failing to handle cases where no water is trapped.",
+    "Off-by-one errors when updating pointers."
+  ],
+  "edgeCases": [
+    "[]",
+    "[0]",
+    "[1,2,1]",
+    "[3,3,3]",
+    "[0,1,0,2,1,0,1,3,2,1,2,1]"
+  ],
+  "hintLadder": [
+    {
+      "level": 1,
+      "text": "What are the two highest bars that determine the water level over a segment?"
+    },
+    {
+      "level": 2,
+      "text": "Consider using two pointers to track the maximum heights from both ends."
+    },
+    {
+      "level": 3,
+      "text": "Calculate trapped water by comparing current height with the minimum of left and right maximum heights."
+    }
+  ],
+  "followups": [
+    "How would you handle streaming input where heights are given one at a time?",
+    "What if the array is too large to fit in memory?",
+    "How would you modify the solution if the width of each bar is not 1?"
+  ],
+  "rubricNotes": [
+    "Strong: Implements the two-pointer technique with correct logic and optimal complexity.",
+    "Adequate: Uses dynamic programming approach with correct logic but higher space complexity.",
+    "Weak: Relies on a brute force approach with nested loops or fails to handle edge cases."
+  ],
+  "expectedComplexity": {
+    "time": "O(n)",
+    "space": "O(1)"
+  },
+  "interviewerConcerns": [
+    {
+      "id": "nested-loop-cost",
+      "topic": "complexity",
+      "label": "nested loop cost",
+      "incorrectPatterns": [
+        "nested for loop",
+        "o(n^2) time"
+      ],
+      "probeExamples": [
+        "Why do you think this approach is efficient?",
+        "What is the time complexity of your solution?",
+        "How does your solution perform on a large input like [0,1,0,2,...]?"
+      ],
+      "counterexamples": [
+        "[0,1,0,2,1,0,1,3,2,1,2,1]"
+      ],
+      "invariant": "The solution must process each element in constant time."
+    },
+    {
+      "id": "incorrect-max-updates",
+      "topic": "update_logic",
+      "label": "incorrect max updates",
+      "incorrectPatterns": [
+        "incorrect left_max",
+        "incorrect right_max",
+        "wrong max update"
+      ],
+      "probeExamples": [
+        "How do you update the maximum heights as you move the pointers?",
+        "What happens if the current height is greater than your stored max?",
+        "Walk me through how your solution updates max heights on [0,1,0,2]."
+      ],
+      "counterexamples": [
+        "[0,1,0,2]",
+        "[2,0,2]"
+      ],
+      "invariant": "left_max and right_max must always be the highest seen from their respective sides."
+    },
+    {
+      "id": "single-element-and-flat",
+      "topic": "edge_cases",
+      "label": "single element and flat",
+      "incorrectPatterns": [
+        "single element",
+        "all same height",
+        "flat array"
+      ],
+      "probeExamples": [
+        "What does your solution return for a single bar?",
+        "How does your solution handle an array where all heights are the same?",
+        "What happens if the array is empty?"
+      ],
+      "counterexamples": [
+        "[]",
+        "[3,3,3]"
+      ],
+      "invariant": "The solution must correctly handle arrays with no potential for trapping water."
+    }
+  ]
+}

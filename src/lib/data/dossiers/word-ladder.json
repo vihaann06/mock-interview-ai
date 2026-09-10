@@ -1,0 +1,105 @@
+{
+  "questionId": "word-ladder",
+  "generatedAt": "2026-09-10T00:06:55.488Z",
+  "generator": {
+    "model": "gpt-4o",
+    "promptVersion": 2
+  },
+  "clarifications": [
+    "Can the beginWord be the same as endWord? Yes, but the sequence length would be 1 if they are the same.",
+    "What if endWord is not in wordList? Return 0, as no valid transformation sequence exists.",
+    "Are all words in wordList unique? Yes, all words are unique.",
+    "Is the transformation case-sensitive? Yes, all words are lowercase.",
+    "Can wordList be empty? Yes, if empty, return 0.",
+    "Can words have different lengths? No, all words are the same length.",
+    "Is mutation of wordList allowed? No, assume wordList is immutable."
+  ],
+  "expectedApproaches": [
+    "Breadth-First Search (BFS) with queue, O(N*M^2) time complexity where N is the number of words and M is the word length.",
+    "Bidirectional BFS to reduce search space, O(N*M) time complexity."
+  ],
+  "solutions": [
+    "Use BFS starting from beginWord, transforming one letter at a time, and checking against wordList. Track visited words to prevent cycles. If endWord is reached, return the transformation count.",
+    "Implement bidirectional BFS from both beginWord and endWord, meeting in the middle to reduce the search space. Maintain visited sets for both directions to track progress."
+  ],
+  "commonMistakes": [
+    "Not marking words as visited immediately after adding to queue, leading to cycles.",
+    "Incorrectly handling the case where beginWord equals endWord.",
+    "Assuming endWord is always in wordList without checking."
+  ],
+  "edgeCases": [
+    "[]",
+    "[\"hit\"]",
+    "[\"hot\", \"dot\", \"dog\", \"cog\"] with beginWord \"hit\" and endWord \"cog\"",
+    "[\"hit\", \"hot\"] with beginWord \"hit\" and endWord \"hot\"",
+    "[\"hot\", \"dot\", \"dog\", \"lot\", \"log\"] with beginWord \"hit\" and endWord \"cog\""
+  ],
+  "hintLadder": [
+    {
+      "level": 1,
+      "text": "How can you explore all possible transformations efficiently?"
+    },
+    {
+      "level": 2,
+      "text": "Consider using a queue to perform a breadth-first search (BFS)."
+    },
+    {
+      "level": 3,
+      "text": "Try transforming one letter at a time and check if the new word is in the word list."
+    }
+  ],
+  "followups": [
+    "How would you handle transformations if the words could be of different lengths?",
+    "What if the word list is extremely large and doesn't fit into memory?",
+    "How would you modify your approach if you needed to find all shortest transformation sequences?"
+  ],
+  "rubricNotes": [
+    "Strong: Implements bidirectional BFS correctly and efficiently, handles all edge cases.",
+    "Adequate: Uses BFS correctly but may not optimize with bidirectional search.",
+    "Weak: Fails to use BFS correctly, does not handle edge cases, or assumes incorrect constraints."
+  ],
+  "expectedComplexity": {
+    "time": "O(N*M)",
+    "space": "O(N*M)"
+  },
+  "interviewerConcerns": [
+    {
+      "id": "bfs-necessity",
+      "topic": "algorithm_justification",
+      "label": "bfs necessity",
+      "incorrectPatterns": [
+        "dfs",
+        "recursive",
+        "backtrack"
+      ],
+      "probeExamples": [
+        "Why did you choose this search strategy?",
+        "How does your approach ensure the shortest path?",
+        "Walk me through your logic on a small example."
+      ],
+      "counterexamples": [
+        "[\"hot\", \"dot\", \"dog\", \"cog\"] with beginWord \"hit\" and endWord \"cog\""
+      ],
+      "invariant": "The shortest path is found by exploring all neighbors level by level."
+    },
+    {
+      "id": "visited-marking",
+      "topic": "update_logic",
+      "label": "visited marking",
+      "incorrectPatterns": [
+        "visited after dequeue",
+        "revisit words",
+        "cycle in queue"
+      ],
+      "probeExamples": [
+        "When do you mark a word as visited?",
+        "How do you prevent cycles in your search?",
+        "Can you show me how you handle revisiting words?"
+      ],
+      "counterexamples": [
+        "[\"hit\", \"hot\", \"dot\", \"dog\", \"cog\"] with beginWord \"hit\" and endWord \"cog\""
+      ],
+      "invariant": "Words are marked visited immediately upon enqueueing."
+    }
+  ]
+}

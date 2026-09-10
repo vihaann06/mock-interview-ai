@@ -7,6 +7,7 @@ import {
   canProbeInactivity,
   hasSpeakableInterviewerMessage,
   initialVoiceConversationState,
+  isUnintendedSilence,
   reduceVoiceConversation,
   type OrchestratorEvent,
 } from "@/lib/voice/orchestration";
@@ -202,6 +203,14 @@ export function useVoiceOrchestrator({
       );
 
       if (!speakable) {
+        if (isUnintendedSilence(response.action, response.message)) {
+          // Intended WAIT is silent by design; this is not. Surface it instead
+          // of letting the turn vanish as dead air. State still returns to
+          // LISTENING so the candidate's next turn is accepted.
+          console.error(
+            `[voice] interviewer action ${response.action} had no speakable message — turn produced no bubble and no speech.`,
+          );
+        }
         dispatch({ type: "INTERVIEWER_WAIT" });
         return;
       }

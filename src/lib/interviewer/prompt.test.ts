@@ -207,3 +207,140 @@ describe("buildInterviewerContext", () => {
     expect(payload.reasoningState.recommendedFocus).toBe("allow-coding");
   });
 });
+
+const stateWithConcern = (
+  overrides: Partial<{
+    escalationLevel: 0 | 1 | 2 | 3;
+    attemptsToProbe: number;
+    templateId: string;
+  }> = {},
+) => ({
+  claims: [],
+  approaches: [],
+  resolvedTopics: [],
+  unresolvedConcerns: [
+    {
+      id: "u1",
+      type: "ALGORITHM_CORRECTNESS" as const,
+      topic: "ordering" as const,
+      summary: "Possible issue: sort order",
+      severity: "important" as const,
+      status: "unresolved" as const,
+      attemptsToProbe: overrides.attemptsToProbe ?? 0,
+      escalationLevel: overrides.escalationLevel ?? 1,
+      firstObservedAt: 1,
+      ...(overrides.templateId ? { templateId: overrides.templateId } : {}),
+    },
+  ],
+  questionsAlreadyAsked: [],
+  hintsGiven: [],
+  updatedAt: 3,
+});
+
+describe("recommendedFocus.suggestedProbe", () => {
+  it("uses the question's authored probeExamples when concerns are present", () => {
+    const payload = JSON.parse(
+      buildInterviewerContext({
+        ...baseInput,
+        stage: "CODING",
+        question: {
+          ...question,
+          interviewerConcerns: [
+            {
+              id: "ordering-invariant",
+              topic: "sort order",
+              probeExamples: ["open probe", "targeted probe", "walkthrough probe"],
+              counterexamples: ["[[1,4],[2,3]]"],
+            },
+          ],
+        },
+        reasoningState: stateWithConcern({
+          escalationLevel: 1,
+          templateId: "ordering-invariant",
+        }),
+      }),
+    ) as {
+      reasoningState: {
+        recommendedFocus: { suggestedProbe?: { level: number; intent: string } };
+      };
+      policyNotes: { suggestedProbe?: string };
+    };
+
+    // escalationLevel 1 -> target level 2 -> probeExamples[1]
+    expect(payload.reasoningState.recommendedFocus.suggestedProbe).toEqual({
+      level: 2,
+      intent: "targeted probe",
+    });
+    expect(payload.policyNotes.suggestedProbe).toMatch(/INTENT of your next question/);
+  });
+
+  it("falls back to a generic probe when the question has no interviewerConcerns", () => {
+    const payload = JSON.parse(
+      buildInterviewerContext({
+        ...baseInput,
+        stage: "CODING",
+        reasoningState: stateWithConcern({ escalationLevel: 1 }),
+      }),
+    ) as {
+      reasoningState: {
+        recommendedFocus: { suggestedProbe?: { level: number; intent: string } };
+      };
+    };
+
+    const probe = payload.reasoningState.recommendedFocus.suggestedProbe;
+    expect(probe?.level).toBe(2);
+    expect(probe?.intent).toMatch(/ordering/);
+  });
+
+  it("escalates to a concrete counterexample walkthrough at level 3", () => {
+    const payload = JSON.parse(
+      buildInterviewerContext({
+        ...baseInput,
+        stage: "CODING",
+        question: {
+          ...question,
+          interviewerConcerns: [
+            {
+              id: "ordering-invariant",
+              topic: "sort order",
+              counterexamples: ["[[1,4],[2,3]]"],
+            },
+          ],
+        },
+        reasoningState: stateWithConcern({
+          escalationLevel: 3,
+          templateId: "ordering-invariant",
+        }),
+      }),
+    ) as {
+      reasoningState: {
+        recommendedFocus: { suggestedProbe?: { level: number; intent: string } };
+      };
+    };
+
+    expect(payload.reasoningState.recommendedFocus.suggestedProbe).toEqual({
+      level: 3,
+      intent: "Walk through your algorithm on [[1,4],[2,3]].",
+    });
+  });
+
+  it("omits suggestedProbe when there is no open concern", () => {
+    const payload = JSON.parse(
+      buildInterviewerContext({
+        ...baseInput,
+        stage: "CODING",
+        reasoningState: {
+          claims: [],
+          approaches: [],
+          resolvedTopics: [],
+          unresolvedConcerns: [],
+          questionsAlreadyAsked: [],
+          hintsGiven: [],
+          updatedAt: 1,
+        },
+      }),
+    ) as { reasoningState: { recommendedFocus: string } };
+
+    expect(payload.reasoningState.recommendedFocus).toBe("allow-coding");
+  });
+});

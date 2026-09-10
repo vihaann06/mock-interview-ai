@@ -1,0 +1,104 @@
+{
+  "questionId": "valid-parentheses",
+  "generatedAt": "2026-09-10T00:06:16.383Z",
+  "generator": {
+    "model": "gpt-4o",
+    "promptVersion": 2
+  },
+  "clarifications": [
+    "What if the string is empty? Return true.",
+    "Can there be any characters other than parentheses? No, only '(', ')', '{', '}', '[' and ']'.",
+    "What should be returned? Return true if the string is valid, false otherwise."
+  ],
+  "expectedApproaches": [
+    "Use a stack to track open parentheses, O(n) time and O(n) space.",
+    "Use a counter for each type of parenthesis, but this fails to handle order."
+  ],
+  "solutions": [
+    "Initialize an empty stack. Iterate over each character in the string. If it's an opening bracket, push it onto the stack. If it's a closing bracket, check if the stack is empty (if so, return false) and if the top of the stack is the matching opening bracket (if not, return false). Pop the stack in this case. Finally, return true if the stack is empty, false otherwise."
+  ],
+  "commonMistakes": [
+    "Forgetting to check if the stack is empty before popping.",
+    "Not checking if the stack is empty at the end of the iteration.",
+    "Using counters instead of a stack, which fails to check order."
+  ],
+  "edgeCases": [
+    "''",
+    "'()'",
+    "'(]'",
+    "'([])'",
+    "'([)]'"
+  ],
+  "hintLadder": [
+    {
+      "level": 1,
+      "text": "What data structure can help you match open and close brackets efficiently?"
+    },
+    {
+      "level": 2,
+      "text": "Consider using a stack to keep track of open brackets."
+    },
+    {
+      "level": 3,
+      "text": "Push open brackets onto a stack and pop when you encounter a matching close bracket."
+    }
+  ],
+  "followups": [
+    "How would you handle a stream of parentheses?",
+    "What if there are additional types of brackets?",
+    "How would you validate a string with nested structures?"
+  ],
+  "rubricNotes": [
+    "Strong: Implements stack-based solution correctly with all edge cases handled.",
+    "Adequate: Uses stack but misses some edge cases or has minor logic errors.",
+    "Weak: Fails to use stack correctly or uses an incorrect approach like counters."
+  ],
+  "expectedComplexity": {
+    "time": "O(n)",
+    "space": "O(n)"
+  },
+  "interviewerConcerns": [
+    {
+      "id": "stack-usage",
+      "topic": "data_structure",
+      "label": "stack usage",
+      "incorrectPatterns": [
+        "counter",
+        "increment",
+        "decrement"
+      ],
+      "probeExamples": [
+        "How are you ensuring that each open bracket has a matching close bracket?",
+        "What data structure are you using to track open brackets?",
+        "Can you walk me through your logic with the input '([)]'?"
+      ],
+      "counterexamples": [
+        "'([)]'",
+        "'(]'",
+        "'{[()]}'"
+      ],
+      "invariant": "The stack contains unmatched open brackets in order."
+    },
+    {
+      "id": "empty-stack-check",
+      "topic": "edge_cases",
+      "label": "empty stack check",
+      "incorrectPatterns": [
+        "stack.pop",
+        "index error",
+        "empty stack"
+      ],
+      "probeExamples": [
+        "What happens if you try to pop from an empty stack?",
+        "How do you handle cases where there are more closing brackets than opening?",
+        "Can you show me how your code handles the input '(]'?"
+      ],
+      "counterexamples": [
+        "'(]'",
+        "'{[}]'",
+        "'([)]'"
+      ],
+      "invariant": "No pop operation occurs on an empty stack."
+    }
+  ]
+}

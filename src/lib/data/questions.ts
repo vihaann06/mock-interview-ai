@@ -1,14 +1,21 @@
-import type { Question } from "@/lib/types/question";
+import type { AuthoredQuestion, Question } from "@/lib/types/question";
+import { dossiers } from "@/lib/data/dossiers";
+import { getDossierOverride } from "@/lib/data/dossier-overrides";
+import { resolveQuestion } from "@/lib/questions/resolve";
 
 const pythonStarter = (fnSignature: string) =>
   `def ${fnSignature}:\n    # Write your solution here\n    pass\n`;
 
 /**
- * Question bank (~10 Google-style DSA problems).
- * Deeply enriched: two-sum, number-of-islands, lru-cache.
- * Remaining entries are light but schema-valid stubs.
+ * Authored question bank — Tier 1 (statement, constraints, starterCode) is
+ * required; every knowledge field below it is optional and, when omitted, comes
+ * from the question's generated dossier (`npm run questions:prep`).
+ *
+ * Hand-authored knowledge always wins over a dossier, so the deeply-enriched
+ * entries here (two-sum, number-of-islands, lru-cache, merge-intervals) are
+ * unaffected by generation.
  */
-export const questions: Question[] = [
+export const authoredQuestions: AuthoredQuestion[] = [
   {
     id: "two-sum",
     title: "Two Sum",
@@ -513,6 +520,17 @@ export const questions: Question[] = [
     expectedComplexity: { time: "O(n)", space: "O(1)" },
   },
 ];
+
+/**
+ * Fully resolved bank: authored fields merged over dossier + overrides.
+ * Built once at module load — resolution is pure object construction.
+ */
+export const questions: Question[] = authoredQuestions.map((authored) =>
+  resolveQuestion(authored, {
+    dossier: dossiers[authored.id],
+    override: getDossierOverride(authored.id),
+  }),
+);
 
 export function getQuestionById(id: string): Question | undefined {
   return questions.find((q) => q.id === id);
