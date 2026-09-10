@@ -1,5 +1,7 @@
 import {
   buildRealtimeTranscriptionSession,
+  looksLikeSdp,
+  normalizeSdpBody,
   resolveSilenceDurationMs,
 } from "@/lib/voice/stt/realtime-config";
 
@@ -54,10 +56,12 @@ async function proxySdpOffer(sdpOffer: string): Promise<Response> {
   const apiKeyOrErr = requireApiKey();
   if (typeof apiKeyOrErr !== "string") return apiKeyOrErr;
 
-  const offer = sdpOffer.trim();
-  if (!offer.startsWith("v=")) {
+  if (!looksLikeSdp(sdpOffer)) {
     return jsonError("Invalid SDP offer", 400);
   }
+  // Forward CRLF-terminated: a trimmed offer makes upstream reject with
+  // "failed to unmarshal SDP: EOF".
+  const offer = normalizeSdpBody(sdpOffer);
 
   const fd = new FormData();
   fd.set("sdp", offer);
@@ -87,7 +91,7 @@ async function proxySdpOffer(sdpOffer: string): Promise<Response> {
     );
   }
 
-  if (!answer.trim().startsWith("v=")) {
+  if (!looksLikeSdp(answer)) {
     return jsonError("OpenAI Realtime returned an invalid SDP answer", 502);
   }
 
@@ -98,7 +102,7 @@ async function proxySdpOffer(sdpOffer: string): Promise<Response> {
   const location = upstream.headers.get("Location");
   if (location) headers.set("X-Realtime-Call-Location", location);
 
-  return new Response(answer, { status: 200, headers });
+  return new Response(normalizeSdpBody(answer), { status: 200, headers });
 }
 
 /** Lightweight config for the browser (silence window). No secrets. */

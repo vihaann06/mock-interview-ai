@@ -62,3 +62,18 @@ export function buildRealtimeTranscriptionSession(): RealtimeTranscriptionSessio
     },
   };
 }
+
+/**
+ * SDP bodies must be CRLF-terminated on every line, including the last
+ * (RFC 4566 §5). Trimming the trailing newline makes the upstream Go parser
+ * fail with "failed to unmarshal SDP: EOF", so normalize the tail only and
+ * leave the body otherwise byte-identical.
+ */
+export function normalizeSdpBody(sdp: string): string {
+  return `${sdp.replace(/[\r\n\s]+$/, "")}\r\n`;
+}
+
+/** An SDP body must begin with the version line. */
+export function looksLikeSdp(sdp: string): boolean {
+  return sdp.trimStart().startsWith("v=");
+}
