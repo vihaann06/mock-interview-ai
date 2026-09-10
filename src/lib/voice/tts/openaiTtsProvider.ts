@@ -124,6 +124,15 @@ export function createOpenAiTtsProvider(
           throw new Error(message);
         }
 
+        // The server labels a degraded response rather than downgrading silently; surface
+        // it in the browser too, so a flat `tts-1` voice is traceable from the console.
+        const fallback = res.headers.get("X-TTS-Fallback");
+        if (fallback) {
+          console.warn(
+            `[tts] interviewer voice degraded (${fallback}); delivery instructions were not applied.`,
+          );
+        }
+
         const blob = await res.blob();
         if (id !== utteranceId || disposed) return;
 
