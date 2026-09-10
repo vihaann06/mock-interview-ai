@@ -1,6 +1,7 @@
 import type { CandidateReasoningState } from "@/lib/types/interview";
 import type { InterviewerContextInput } from "./types";
 import { summarizeLatestExecution, truncateForPrompt } from "./execution-context";
+import { nextEscalationProbe } from "./reasoning-state";
 
 const BASE_SYSTEM_PROMPT = `You are a senior engineer running a live coding screen. You sound like a restrained human interviewer across the table — precise, calm, not theatrical. You are an interviewer, not a tutor, not a narrator, and not a stage manager.
 
@@ -149,6 +150,13 @@ const SEVERITY_RANK: Record<string, number> = {
  */
 function summarizeReasoningState(
   state: CandidateReasoningState | null | undefined,
+  question: {
+    interviewerConcerns?: Array<{
+      id: string;
+      probeExamples?: string[];
+      counterexamples?: string[];
+    }>;
+  },
 ): Record<string, unknown> | null {
   if (!state) return null;
 
@@ -192,6 +200,7 @@ function summarizeReasoningState(
   }));
 
   const primary = unresolvedConcerns[0];
+  const probe = primary ? nextEscalationProbe(state, question) : null;
   const recommendedFocus = primary
     ? {
         kind: "unresolved-concern" as const,
@@ -200,6 +209,14 @@ function summarizeReasoningState(
         summary: primary.summary,
         escalationLevel: primary.escalationLevel,
         attemptsToProbe: primary.attemptsToProbe,
+        ...(probe
+          ? {
+              suggestedProbe: {
+                level: probe.level,
+                intent: probe.suggestion,
+              },
+            }
+          : {}),
       }
     : ("allow-coding" as const);
 
@@ -299,7 +316,7 @@ export function buildInterviewerContext(input: InterviewerContextInput): string 
       }
     : null;
 
-  const reasoningStateSummary = summarizeReasoningState(reasoningState);
+  const reasoningStateSummary = summarizeReasoningState(reasoningState, question);
 
   const questionCore = {
     id,
@@ -336,6 +353,8 @@ export function buildInterviewerContext(input: InterviewerContextInput): string 
       "Prefer 1 concise sentence (max 2 unless opening). One primary question. No paraphrase preambles. No routine praise. Do not start with 'You mentioned…' / 'I see you're…' / 'Can you clarify…' as a habit.",
     memory:
       "Always consult reasoningState when present. Never re-ask resolvedTopics or questionsAlreadyAsked intents. Prefer unresolvedConcerns over new topics; escalate probes using concern metadata.",
+    suggestedProbe:
+      "When recommendedFocus.suggestedProbe is present it is the INTENT of your next question, not a script. Ask that intent in your own voice, one sentence. Level 1 = open (let them justify), 2 = targeted (name the specific topic), 3 = concrete (make them walk a specific input). Never read the intent text verbatim, never quote it as a hint, and never mention levels or concerns to the candidate.",
     objective: "Each turn advances exactly one interview objective.",
     correctnessQuestions:
       "Do not confirm/deny 'is this correct?' — probe the highest-value open concern or verification walkthrough.",
